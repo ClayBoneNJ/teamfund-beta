@@ -636,14 +636,15 @@ function promptTeamPaymentChoice(key, label, fileEl) {
   const isVenmo = key === "venmoQr";
   const defaultPrefix = isVenmo ? "https://account.venmo.com/u/" : "";
   const currentUrl = current?.type === "generated" ? current.sourceUrl : current?.type === "url" ? current.value : "";
+  const currentValue = isVenmo && currentUrl.startsWith(defaultPrefix) ? currentUrl.slice(defaultPrefix.length) : (currentUrl || "");
   openAppDialog({
     title: label,
-    message: "Upload a QR image or paste a URL below.",
+    message: isVenmo ? "Upload a QR image, enter a Venmo username, or paste a full URL below." : "Upload a QR image or paste a URL below.",
     inputType: "text",
-    inputLabel: "URL",
-    inputPrefix: isVenmo ? defaultPrefix : "",
-    inputValue: isVenmo && currentUrl.startsWith(defaultPrefix) ? currentUrl.slice(defaultPrefix.length) : (currentUrl || ""),
-    inputPlaceholder: isVenmo ? "username" : "https://www.example.com",
+    inputLabel: isVenmo ? "Username or URL" : "URL",
+    inputPrefix: "",
+    inputValue: currentValue,
+    inputPlaceholder: isVenmo ? "username or https://account.venmo.com/u/username" : "https://www.example.com",
     confirmLabel: "Save Link",
     extraLabel: "Upload Picture",
     tertiaryLabel: current ? "Clear QR" : "",
@@ -651,7 +652,7 @@ function promptTeamPaymentChoice(key, label, fileEl) {
     allowBackdropClose: false,
     onConfirm: async (value) => {
       const raw = String(value || "").trim();
-      const url = isVenmo ? `${defaultPrefix}${raw}` : raw;
+      const url = isVenmo && raw && !isHttpUrl(raw) ? `${defaultPrefix}${raw}` : raw;
       if (!isHttpUrl(url)) {
         openAppDialog({ title: "Invalid URL", message: "Enter a full URL starting with http:// or https://.", confirmLabel: "OK", showCancel: false });
         return false;
