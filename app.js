@@ -6,6 +6,8 @@ const DB_STATE_KEY = "state";
 const MAX_FLYERS_PER_EVENT = 2;
 const DEFAULT_TEAM_STATE = {
   name: "",
+  division: "",
+  hometown: "",
   coach: "",
   assistantCoach: "",
   teamManager: "",
@@ -21,6 +23,8 @@ const DEFAULT_TEAM_STATE = {
 };
 const RESET_TEAM_STATE = {
   name: "",
+  division: "",
+  hometown: "",
   coach: "",
   assistantCoach: "",
   teamManager: "",
@@ -48,6 +52,8 @@ const cancelTeamBtn = $("cancelTeamBtn");
 const resetTeamBtn = $("resetTeamBtn");
 const teamModal = $("teamModal");
 const teamNameEl = $("teamName");
+const teamDivisionEl = $("teamDivision");
+const teamHometownEl = $("teamHometown");
 const coachNameEl = $("coachName");
 const assistantCoachNameEl = $("assistantCoachName");
 const teamManagerNameEl = $("teamManagerName");
@@ -65,6 +71,8 @@ const teamZelleQrPreviewEl = $("teamZelleQrPreview");
 const teamZelleQrFileEl = $("teamZelleQrFile");
 const editTeamVenmoQrBtn = $("editTeamVenmoQrBtn");
 const editTeamZelleQrBtn = $("editTeamZelleQrBtn");
+const appHeaderTitleEl = $("appHeaderTitle");
+const appHeaderSubtitleEl = $("appHeaderSubtitle");
 const openGoalBtn = $("openGoalBtn");
 const goalModal = $("goalModal");
 const goalForm = $("goalForm");
@@ -339,6 +347,8 @@ function resetAllData() {
   selectedPlayerAnchor = null;
   selectedEventId = null;
   teamNameEl.value = state.team.name;
+  teamDivisionEl.value = state.team.division;
+  teamHometownEl.value = state.team.hometown;
   coachNameEl.value = state.team.coach;
   assistantCoachNameEl.value = state.team.assistantCoach;
   teamManagerNameEl.value = state.team.teamManager;
@@ -938,7 +948,7 @@ function applyTheme() {
 
 function anyModalOpen() { return !teamModal.classList.contains("is-hidden") || !goalModal.classList.contains("is-hidden") || !rosterModal.classList.contains("is-hidden") || !eventModal.classList.contains("is-hidden") || !eventDetailModal.classList.contains("is-hidden") || !slotAssignModal.classList.contains("is-hidden") || !appDialogModal.classList.contains("is-hidden") || !photoCropModal.classList.contains("is-hidden") || !flyerPreviewModal.classList.contains("is-hidden"); }
 function syncBodyLock() { document.body.classList.toggle("modal-open", anyModalOpen()); }
-function openTeam(open) { if (open) { teamNameEl.value = state.team.name; coachNameEl.value = state.team.coach; assistantCoachNameEl.value = state.team.assistantCoach || ""; teamManagerNameEl.value = state.team.teamManager || ""; teamParentNameEl.value = state.team.teamParent || ""; teamColor1El.value = state.team.color1; teamColor2El.value = state.team.color2; teamAccentEl.value = state.team.accent; logoFileNameEl.textContent = "No file selected"; teamLogoEl.value = ""; } teamModal.classList.toggle("is-hidden", !open); syncBodyLock(); }
+function openTeam(open) { if (open) { teamNameEl.value = state.team.name; teamDivisionEl.value = state.team.division || ""; teamHometownEl.value = state.team.hometown || ""; coachNameEl.value = state.team.coach; assistantCoachNameEl.value = state.team.assistantCoach || ""; teamManagerNameEl.value = state.team.teamManager || ""; teamParentNameEl.value = state.team.teamParent || ""; teamColor1El.value = state.team.color1; teamColor2El.value = state.team.color2; teamAccentEl.value = state.team.accent; logoFileNameEl.textContent = "No file selected"; teamLogoEl.value = ""; } teamModal.classList.toggle("is-hidden", !open); syncBodyLock(); }
 function openGoal(open) {
   if (open) {
     goalTitleInputEl.value = state.team.goalTitle || "";
@@ -1069,11 +1079,16 @@ async function openFlyerPreview(open, src = "", title = "Flyer Preview", mime = 
 }
 
 function renderTeam() {
-  $("teamNameValue").textContent = state.team.name || "Not set";
   $("coachNameValue").textContent = state.team.coach || "Not set";
   const assistantCoach = String(state.team.assistantCoach || "").trim();
   const teamManager = String(state.team.teamManager || "").trim();
   const teamParent = String(state.team.teamParent || "").trim();
+  const teamName = String(state.team.name || "").trim();
+  const teamDivision = String(state.team.division || "").trim();
+  const teamHometown = String(state.team.hometown || "").trim();
+  const subtitleParts = [teamDivision, teamHometown].filter(Boolean);
+  if (appHeaderTitleEl) appHeaderTitleEl.textContent = teamName || "TeamFund";
+  if (appHeaderSubtitleEl) appHeaderSubtitleEl.textContent = subtitleParts.length ? subtitleParts.join(" • ") : "Team-first fundraising dashboard";
   $("assistantCoachValue").textContent = assistantCoach || "Not set";
   $("teamManagerValue").textContent = teamManager || "Not set";
   $("teamParentValue").textContent = teamParent || "Not set";
@@ -2024,6 +2039,8 @@ function wireInputs() {
   teamForm.addEventListener("submit", async (e) => {
     e.preventDefault();
     state.team.name = teamNameEl.value.trim();
+    state.team.division = teamDivisionEl.value.trim();
+    state.team.hometown = teamHometownEl.value.trim();
     state.team.coach = coachNameEl.value.trim();
     state.team.assistantCoach = assistantCoachNameEl.value.trim();
     state.team.teamManager = teamManagerNameEl.value.trim();

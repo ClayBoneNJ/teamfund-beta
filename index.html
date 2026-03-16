@@ -19,8 +19,8 @@
       <img id="headerLogo" alt="Team logo" />
     </div>
     <header class="app-header">
-      <h1>TeamFund</h1>
-      <p>Team-first fundraising dashboard</p>
+      <h1 id="appHeaderTitle">TeamFund</h1>
+      <p id="appHeaderSubtitle">Team-first fundraising dashboard</p>
     </header>
 
     <section class="grid">
@@ -32,10 +32,6 @@
 
         <div id="teamDisplay" class="team-display">
           <div class="team-lines">
-            <div class="team-line-item">
-              <p class="meta-label">Team Name</p>
-              <p class="meta-value" id="teamNameValue">Not set</p>
-            </div>
             <div class="team-line-item">
               <p class="meta-label">Coach/Organizer</p>
               <p class="meta-value" id="coachNameValue">Not set</p>
@@ -122,6 +118,14 @@
         <div class="stack-sm">
           <label class="field-label" for="teamName">Team Name</label>
           <input id="teamName" type="text" placeholder="12U Wildcats" />
+        </div>
+        <div class="stack-sm">
+          <label class="field-label" for="teamDivision">League / Division</label>
+          <input id="teamDivision" type="text" placeholder="Cal Ripken Majors or 12U AA" />
+        </div>
+        <div class="stack-sm">
+          <label class="field-label" for="teamHometown">Hometown</label>
+          <input id="teamHometown" type="text" placeholder="Sayreville, NJ" />
         </div>
         <div class="stack-sm">
           <label class="field-label" for="coachName">Coach/Organizer</label>
