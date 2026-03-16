@@ -222,6 +222,17 @@ const PDFJS_WORKER_SRC = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174
 
 const escapeHtml = (v) => String(v || "").replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;").replaceAll("'", "&#39;");
 const formatMoney = (v) => new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", minimumFractionDigits: 2 }).format(v || 0);
+function parseMoneyInput(value) {
+  const cleaned = String(value || "").replace(/[^0-9.-]/g, "");
+  if (!cleaned || cleaned === "-" || cleaned === "." || cleaned === "-.") return 0;
+  const parsed = Number(cleaned);
+  return Number.isFinite(parsed) ? parsed : NaN;
+}
+function formatMoneyInputValue(value) {
+  const parsed = parseMoneyInput(value);
+  if (!Number.isFinite(parsed) || parsed <= 0) return "";
+  return formatMoney(parsed);
+}
 function mapSearchHref(query) {
   const clean = String(query || "").trim();
   if (!clean) return "#";
@@ -914,7 +925,7 @@ function openTeam(open) { if (open) { teamNameEl.value = state.team.name; coachN
 function openGoal(open) {
   if (open) {
     goalTitleInputEl.value = state.team.goalTitle || "";
-    goalAmountInputEl.value = state.team.goalAmount || "";
+    goalAmountInputEl.value = formatMoneyInputValue(state.team.goalAmount);
   }
   goalModal.classList.toggle("is-hidden", !open);
   syncBodyLock();
@@ -959,15 +970,17 @@ function openAppDialog(config) {
   if (appDialogInputLabelEl) appDialogInputLabelEl.textContent = config?.inputLabel || "Value";
   if (appDialogInputFieldWrapEl) appDialogInputFieldWrapEl.classList.toggle("has-prefix", !!inputPrefix);
   if (appDialogInputPrefixEl) appDialogInputPrefixEl.textContent = inputPrefix;
-  appDialogInputEl.type = config?.inputType || "text";
-  appDialogInputEl.value = config?.inputValue ?? "";
+  appDialogInputEl.type = inputPrefix === "$" ? "text" : (config?.inputType || "text");
+  appDialogInputEl.value = inputPrefix === "$" ? formatMoneyInputValue(config?.inputValue) : (config?.inputValue ?? "");
+  appDialogInputEl.inputMode = inputPrefix === "$" || config?.inputType === "number" ? "decimal" : "text";
   appDialogInputEl.placeholder = config?.inputPlaceholder || "";
   appDialogInput2WrapEl.classList.toggle("is-hidden", !input2Mode);
   if (appDialogInput2LabelEl) appDialogInput2LabelEl.textContent = config?.input2Label || "Value";
   if (appDialogInput2FieldWrapEl) appDialogInput2FieldWrapEl.classList.toggle("has-prefix", !!input2Prefix);
   if (appDialogInput2PrefixEl) appDialogInput2PrefixEl.textContent = input2Prefix;
-  appDialogInput2El.type = config?.input2Type || "text";
-  appDialogInput2El.value = config?.input2Value ?? "";
+  appDialogInput2El.type = input2Prefix === "$" ? "text" : (config?.input2Type || "text");
+  appDialogInput2El.value = input2Prefix === "$" ? formatMoneyInputValue(config?.input2Value) : (config?.input2Value ?? "");
+  appDialogInput2El.inputMode = input2Prefix === "$" || config?.input2Type === "number" ? "decimal" : "text";
   appDialogInput2El.placeholder = config?.input2Placeholder || "";
   appDialogConfirmBtn.textContent = config?.confirmLabel || "OK";
   appDialogCancelBtn.textContent = config?.cancelLabel || "Cancel";
@@ -2028,10 +2041,13 @@ function wireInputs() {
   teamAccentEl.addEventListener("input", () => { state.team.accent = teamAccentEl.value; applyTheme(); });
   openGoalBtn.addEventListener("click", () => openGoal(true));
   cancelGoalBtn.addEventListener("click", () => openGoal(false));
+  goalAmountInputEl.addEventListener("blur", () => {
+    goalAmountInputEl.value = formatMoneyInputValue(goalAmountInputEl.value);
+  });
   goalForm.addEventListener("submit", (e) => {
     e.preventDefault();
     state.team.goalTitle = goalTitleInputEl.value.trim();
-    state.team.goalAmount = Number(goalAmountInputEl.value) || 0;
+    state.team.goalAmount = Math.max(0, parseMoneyInput(goalAmountInputEl.value) || 0);
     renderGoal();
     openGoal(false);
     saveState();
@@ -2392,8 +2408,8 @@ function wireInputs() {
             openAppDialog({ title: "Invalid Value", message: "Enter an amount to add and/or a total to set.", confirmLabel: "OK", showCancel: false });
             return false;
           }
-          const add = addRaw ? Number(addRaw) : 0;
-          const set = setRaw ? Number(setRaw) : null;
+          const add = addRaw ? parseMoneyInput(addRaw) : 0;
+          const set = setRaw ? parseMoneyInput(setRaw) : null;
           if (Number.isNaN(add) || add < 0 || (setRaw && (set === null || Number.isNaN(set) || set < 0))) {
             openAppDialog({ title: "Invalid Value", message: "Enter a valid non-negative number.", confirmLabel: "OK", showCancel: false });
             return false;
@@ -2451,8 +2467,8 @@ function wireInputs() {
           openAppDialog({ title: "Invalid Value", message: "Enter an amount to add and/or a total to set.", confirmLabel: "OK", showCancel: false });
           return false;
         }
-        const add = addRaw ? Number(addRaw) : 0;
-        const set = setRaw ? Number(setRaw) : null;
+        const add = addRaw ? parseMoneyInput(addRaw) : 0;
+        const set = setRaw ? parseMoneyInput(setRaw) : null;
         if (Number.isNaN(add) || add < 0 || (setRaw && (set === null || Number.isNaN(set) || set < 0))) {
           openAppDialog({ title: "Invalid Value", message: "Enter a valid non-negative number.", confirmLabel: "OK", showCancel: false });
           return false;
