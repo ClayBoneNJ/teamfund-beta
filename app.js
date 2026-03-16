@@ -1866,6 +1866,26 @@ function openCropForSource(src) {
     img.src = src;
   });
 }
+function startCropDrag(clientX, clientY) {
+  cropState.dragging = true;
+  cropState.lastX = clientX;
+  cropState.lastY = clientY;
+  cropCanvas.classList.add("is-dragging");
+}
+function moveCropDrag(clientX, clientY) {
+  if (!cropState.dragging) return;
+  const dx = clientX - cropState.lastX;
+  const dy = clientY - cropState.lastY;
+  cropState.lastX = clientX;
+  cropState.lastY = clientY;
+  cropState.offsetX += dx;
+  cropState.offsetY += dy;
+  drawCrop();
+}
+function stopCropDrag() {
+  cropState.dragging = false;
+  cropCanvas.classList.remove("is-dragging");
+}
 function clearEventFlyerPreviews() {
   openFlyerPreview(false);
   eventFlyerPreviewUrls.forEach((url) => URL.revokeObjectURL(url));
@@ -2065,9 +2085,19 @@ function wireInputs() {
     if (src) openCropForSource(src).catch(() => {});
   });
   cropZoomEl.addEventListener("input", () => { cropState.zoom = Number(cropZoomEl.value) || 1; drawCrop(); });
-  cropCanvas.addEventListener("mousedown", (e) => { cropState.dragging = true; cropState.lastX = e.clientX; cropState.lastY = e.clientY; cropCanvas.classList.add("is-dragging"); });
-  window.addEventListener("mouseup", () => { cropState.dragging = false; cropCanvas.classList.remove("is-dragging"); });
-  window.addEventListener("mousemove", (e) => { if (!cropState.dragging) return; const dx = e.clientX - cropState.lastX; const dy = e.clientY - cropState.lastY; cropState.lastX = e.clientX; cropState.lastY = e.clientY; cropState.offsetX += dx; cropState.offsetY += dy; drawCrop(); });
+  cropCanvas.addEventListener("pointerdown", (e) => {
+    e.preventDefault();
+    startCropDrag(e.clientX, e.clientY);
+    cropCanvas.setPointerCapture?.(e.pointerId);
+  });
+  cropCanvas.addEventListener("pointermove", (e) => {
+    if (!cropState.dragging) return;
+    e.preventDefault();
+    moveCropDrag(e.clientX, e.clientY);
+  });
+  cropCanvas.addEventListener("pointerup", () => { stopCropDrag(); });
+  cropCanvas.addEventListener("pointercancel", () => { stopCropDrag(); });
+  window.addEventListener("pointerup", () => { stopCropDrag(); });
   applyCropBtn.addEventListener("click", () => { pendingPlayerPhotoDataUrl = cropCanvas.toDataURL("image/png"); setRosterPreview(pendingPlayerPhotoDataUrl); playerPhotoFileNameEl.textContent = "Cropped photo ready"; playerPhotoEl.value = ""; openCrop(false); });
   cancelCropBtn.addEventListener("click", () => { playerPhotoEl.value = ""; pendingPlayerPhotoDataUrl = ""; if (editingPlayerIndex !== null && state.players[editingPlayerIndex]?.photoDataUrl) { setRosterPreview(state.players[editingPlayerIndex].photoDataUrl); playerPhotoFileNameEl.textContent = "Current photo on file"; } else { setRosterPreview(""); playerPhotoFileNameEl.textContent = "No file selected"; } openCrop(false); });
 

@@ -1599,6 +1599,7 @@ button:hover,
   height: auto;
   display: block;
   cursor: grab;
+  touch-action: none;
 }
 
 .crop-canvas-wrap canvas.is-dragging {
