@@ -2615,16 +2615,7 @@ function wireInputs() {
     const e = getEventById(selectedEventId);
     if (!e) return;
     if (e.isLive === false) {
-      openAppDialog({
-        title: "Ended Event",
-        message: "Changes cannot be made to ended events.",
-        confirmLabel: "Continue",
-        cancelLabel: "Cancel",
-        onConfirm: () => {
-          startEditingEvent(e);
-          return true;
-        },
-      });
+      deleteSelectedEvent();
       return;
     }
     startEditingEvent(e);
