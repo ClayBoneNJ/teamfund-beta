@@ -448,12 +448,12 @@ function formatCountdownFromMs(ms) {
 }
 function getSuggestedEventTitlePlaceholder(type) {
   const normalized = normalizeType(type);
-  if (normalized === "canning") return "Community Canning Day";
-  if (normalized === "raffle") return "Spring Prize Raffle";
-  if (normalized === "restaurant_night") return "Restaurant Night at Bella's";
-  if (normalized === "merch") return "Team Hoodie Preorder";
-  if (normalized === "other") return "Saturday Car Wash";
-  return "Saturday Car Wash";
+  if (normalized === "canning") return "Weekend Canning Drive";
+  if (normalized === "raffle") return "Team Prize Raffle";
+  if (normalized === "restaurant_night") return "Dine to Donate Night";
+  if (normalized === "merch") return "Team Spirit Wear Sale";
+  if (normalized === "other") return "Community Car Wash Fundraiser";
+  return "Community Car Wash Fundraiser";
 }
 function renderRaffleDrawInfo(event) {
   const raffle = normalizeType(event?.type) === "raffle";
