@@ -584,6 +584,13 @@ function openTeamPaymentPreview(key, title) {
   const logoPath = asset.type === "generated" ? getTeamPaymentLogoPath(key) : "";
   openFlyerPreview(true, asset.value, title, "image/*", logoPath);
 }
+function handleTeamPaymentCardClick(key, title, fileEl) {
+  if (getTeamPaymentAsset(key)?.value) {
+    openTeamPaymentPreview(key, title);
+    return;
+  }
+  promptTeamPaymentChoice(key, title, fileEl);
+}
 function promptTeamPaymentLink(key, label) {
   const current = getTeamPaymentAsset(key);
   openAppDialog({
@@ -2016,8 +2023,8 @@ function wireInputs() {
     applyTheme(); renderTeam(); openTeam(false); saveState();
   });
   teamLogoEl.addEventListener("change", () => { logoFileNameEl.textContent = teamLogoEl.files?.[0]?.name || "No file selected"; });
-  teamVenmoQrBtn.addEventListener("click", () => openTeamPaymentPreview("venmoQr", "Venmo QR"));
-  teamZelleQrBtn.addEventListener("click", () => openTeamPaymentPreview("zelleQr", "Zelle QR Code"));
+  teamVenmoQrBtn.addEventListener("click", () => handleTeamPaymentCardClick("venmoQr", "Venmo QR", teamVenmoQrFileEl));
+  teamZelleQrBtn.addEventListener("click", () => handleTeamPaymentCardClick("zelleQr", "Zelle QR Code", teamZelleQrFileEl));
   editTeamVenmoQrBtn.addEventListener("click", () => promptTeamPaymentChoice("venmoQr", "Venmo QR", teamVenmoQrFileEl));
   editTeamZelleQrBtn.addEventListener("click", () => promptTeamPaymentChoice("zelleQr", "Zelle QR Code", teamZelleQrFileEl));
   teamVenmoQrFileEl.addEventListener("change", async () => {
