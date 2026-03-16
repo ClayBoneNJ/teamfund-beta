@@ -236,10 +236,32 @@ function parseMoneyInput(value) {
   const parsed = Number(cleaned);
   return Number.isFinite(parsed) ? parsed : NaN;
 }
+function formatMoneyTypingValue(value, includeSymbol = true) {
+  const raw = String(value || "");
+  const negative = raw.trim().startsWith("-") ? "-" : "";
+  const cleaned = raw.replace(/[^0-9.]/g, "");
+  const parts = cleaned.split(".");
+  const wholeRaw = parts.shift() || "";
+  const decimalRaw = parts.join("").slice(0, 2);
+  const hasDot = cleaned.includes(".");
+  const normalizedWhole = wholeRaw.replace(/^0+(?=\d)/, "") || (wholeRaw || decimalRaw ? "0" : "");
+  const wholeWithCommas = normalizedWhole ? normalizedWhole.replace(/\B(?=(\d{3})+(?!\d))/g, ",") : "";
+  const symbol = includeSymbol && (wholeWithCommas || decimalRaw || hasDot) ? "$" : "";
+  const decimalPart = hasDot ? `.${decimalRaw}` : "";
+  return `${negative}${symbol}${wholeWithCommas}${decimalPart}`;
+}
 function formatMoneyInputValue(value) {
   const parsed = parseMoneyInput(value);
   if (!Number.isFinite(parsed) || parsed <= 0) return "";
   return formatMoney(parsed);
+}
+function applyLiveMoneyFormatting(input, includeSymbol = true) {
+  if (!input) return;
+  input.inputMode = "decimal";
+  input.value = formatMoneyTypingValue(input.value, includeSymbol);
+  input.oninput = () => {
+    input.value = formatMoneyTypingValue(input.value, includeSymbol);
+  };
 }
 function mapSearchHref(query) {
   const clean = String(query || "").trim();
@@ -998,17 +1020,21 @@ function openAppDialog(config) {
   if (appDialogInputFieldWrapEl) appDialogInputFieldWrapEl.classList.toggle("has-prefix", !!inputPrefix);
   if (appDialogInputPrefixEl) appDialogInputPrefixEl.textContent = inputPrefix;
   appDialogInputEl.type = inputPrefix === "$" ? "text" : (config?.inputType || "text");
-  appDialogInputEl.value = inputPrefix === "$" ? formatMoneyInputValue(config?.inputValue) : (config?.inputValue ?? "");
+  appDialogInputEl.value = inputPrefix === "$" ? formatMoneyTypingValue(config?.inputValue, false) : (config?.inputValue ?? "");
   appDialogInputEl.inputMode = inputPrefix === "$" || config?.inputType === "number" ? "decimal" : "text";
   appDialogInputEl.placeholder = config?.inputPlaceholder || "";
+  appDialogInputEl.oninput = null;
   appDialogInput2WrapEl.classList.toggle("is-hidden", !input2Mode);
   if (appDialogInput2LabelEl) appDialogInput2LabelEl.textContent = config?.input2Label || "Value";
   if (appDialogInput2FieldWrapEl) appDialogInput2FieldWrapEl.classList.toggle("has-prefix", !!input2Prefix);
   if (appDialogInput2PrefixEl) appDialogInput2PrefixEl.textContent = input2Prefix;
   appDialogInput2El.type = input2Prefix === "$" ? "text" : (config?.input2Type || "text");
-  appDialogInput2El.value = input2Prefix === "$" ? formatMoneyInputValue(config?.input2Value) : (config?.input2Value ?? "");
+  appDialogInput2El.value = input2Prefix === "$" ? formatMoneyTypingValue(config?.input2Value, false) : (config?.input2Value ?? "");
   appDialogInput2El.inputMode = input2Prefix === "$" || config?.input2Type === "number" ? "decimal" : "text";
   appDialogInput2El.placeholder = config?.input2Placeholder || "";
+  appDialogInput2El.oninput = null;
+  if (inputPrefix === "$") applyLiveMoneyFormatting(appDialogInputEl, false);
+  if (input2Prefix === "$") applyLiveMoneyFormatting(appDialogInput2El, false);
   appDialogConfirmBtn.textContent = config?.confirmLabel || "OK";
   appDialogCancelBtn.textContent = config?.cancelLabel || "Cancel";
   if (appDialogExtraBtn) {
@@ -1380,7 +1406,8 @@ function addRafflePrizeRow(prize = { title: "", value: "" }, rowState = "saved")
   row.className = "raffle-prize-row";
   row.setAttribute("data-raffle-prize-row", "1");
   row.setAttribute("data-row-state", rowState);
-  row.innerHTML = `<input class="raffle-prize-title" type="text" placeholder="Prize title" value="${escapeHtml(prize.title || "")}" /><input class="raffle-prize-value" type="number" min="0" step="0.01" placeholder="Value ($)" value="${escapeHtml(prize.value || "")}" /><button type="button" class="raffle-prize-action-btn">Remove</button>`;
+  row.innerHTML = `<input class="raffle-prize-title" type="text" placeholder="Prize title" value="${escapeHtml(prize.title || "")}" /><input class="raffle-prize-value" type="text" inputmode="decimal" placeholder="$0.00" value="${escapeHtml(formatMoneyTypingValue(prize.value || "", true))}" /><button type="button" class="raffle-prize-action-btn">Remove</button>`;
+  applyLiveMoneyFormatting(row.querySelector(".raffle-prize-value"));
   const actionBtn = row.querySelector(".raffle-prize-action-btn");
   if (actionBtn) {
     if (rowState === "draft") {
@@ -1432,7 +1459,8 @@ function renderEventTypeDetails(type, details = {}) {
   }
   if (type === "raffle") {
     const pricing = getRaffleTicketPricing(details);
-    eventTypeDetailsEl.innerHTML = `<div class="raffle-ticket-pricing-grid"><div class="stack-sm"><label class="field-label" for="rafflePriceOne">1 for</label><input id="rafflePriceOne" type="number" min="0" step="0.01" placeholder="0.00" value="${escapeHtml(String(pricing.one || ""))}" /></div><div class="stack-sm"><label class="field-label" for="rafflePriceFive">5 for</label><input id="rafflePriceFive" type="number" min="0" step="0.01" placeholder="0.00" value="${escapeHtml(String(pricing.five || ""))}" /></div><div class="stack-sm"><label class="field-label" for="rafflePriceTen">10 for</label><input id="rafflePriceTen" type="number" min="0" step="0.01" placeholder="0.00" value="${escapeHtml(String(pricing.ten || ""))}" /></div><div class="stack-sm"><label class="field-label" for="rafflePriceCustom">X for each</label><input id="rafflePriceCustom" type="number" min="0" step="0.01" placeholder="0.00" value="${escapeHtml(String(pricing.custom || ""))}" /></div></div><div class="stack-sm"><label class="field-label">Prizes</label><div id="rafflePrizeList" class="stack-sm"></div></div><div class="stack-sm"><label class="field-label" for="raffleDrawingDate">Drawing Date</label><div class="calendar-input-wrap single"><input id="raffleDrawingDate" type="datetime-local" value="${escapeHtml(details.drawingDate || "")}" /><button type="button" class="calendar-trigger" data-calendar-target="raffleDrawingDate" aria-label="Open date picker" title="Open calendar"><span aria-hidden="true">&#128197;</span></button></div></div>`;
+    eventTypeDetailsEl.innerHTML = `<div class="raffle-ticket-pricing-grid"><div class="stack-sm"><label class="field-label" for="rafflePriceOne">1 for</label><input id="rafflePriceOne" type="text" inputmode="decimal" placeholder="$0.00" value="${escapeHtml(formatMoneyTypingValue(pricing.one || "", true))}" /></div><div class="stack-sm"><label class="field-label" for="rafflePriceFive">5 for</label><input id="rafflePriceFive" type="text" inputmode="decimal" placeholder="$0.00" value="${escapeHtml(formatMoneyTypingValue(pricing.five || "", true))}" /></div><div class="stack-sm"><label class="field-label" for="rafflePriceTen">10 for</label><input id="rafflePriceTen" type="text" inputmode="decimal" placeholder="$0.00" value="${escapeHtml(formatMoneyTypingValue(pricing.ten || "", true))}" /></div><div class="stack-sm"><label class="field-label" for="rafflePriceCustom">X for each</label><input id="rafflePriceCustom" type="text" inputmode="decimal" placeholder="$0.00" value="${escapeHtml(formatMoneyTypingValue(pricing.custom || "", true))}" /></div></div><div class="stack-sm"><label class="field-label">Prizes</label><div id="rafflePrizeList" class="stack-sm"></div></div><div class="stack-sm"><label class="field-label" for="raffleDrawingDate">Drawing Date</label><div class="calendar-input-wrap single"><input id="raffleDrawingDate" type="datetime-local" value="${escapeHtml(details.drawingDate || "")}" /><button type="button" class="calendar-trigger" data-calendar-target="raffleDrawingDate" aria-label="Open date picker" title="Open calendar"><span aria-hidden="true">&#128197;</span></button></div></div>`;
+    ["rafflePriceOne", "rafflePriceFive", "rafflePriceTen", "rafflePriceCustom"].forEach((id) => applyLiveMoneyFormatting($(id)));
     renderRafflePrizeRows(details.prizes || []);
     return;
   }
@@ -1470,16 +1498,16 @@ function collectTypeDetails(type, existing = {}) {
       const title = row.querySelector(".raffle-prize-title")?.value.trim() || "";
       const valueRaw = row.querySelector(".raffle-prize-value")?.value.trim() || "";
       if (!title && !valueRaw) return;
-      prizes.push({ title, value: valueRaw });
+      prizes.push({ title, value: valueRaw ? String(parseMoneyInput(valueRaw) || 0) : "" });
     });
     return {
       prizes,
       drawingDate: $("raffleDrawingDate")?.value || "",
       ticketPricing: {
-        one: Number($("rafflePriceOne")?.value) || 0,
-        five: Number($("rafflePriceFive")?.value) || 0,
-        ten: Number($("rafflePriceTen")?.value) || 0,
-        custom: Number($("rafflePriceCustom")?.value) || 0,
+        one: parseMoneyInput($("rafflePriceOne")?.value) || 0,
+        five: parseMoneyInput($("rafflePriceFive")?.value) || 0,
+        ten: parseMoneyInput($("rafflePriceTen")?.value) || 0,
+        custom: parseMoneyInput($("rafflePriceCustom")?.value) || 0,
       },
       ticketSales: getRaffleTicketSales(existing),
     };
@@ -1573,6 +1601,7 @@ function resetRaffleTicketForm() {
   if (raffleTicketForm) raffleTicketForm.reset();
   if (raffleTicketPackageEl) raffleTicketPackageEl.value = "1";
   if (raffleCustomTicketCountEl) raffleCustomTicketCountEl.value = "1";
+  if (raffleAmountPaidEl) raffleAmountPaidEl.value = "";
   raffleCustomTicketCountWrap?.classList.add("is-hidden");
   if (raffleTicketSaveBtn) raffleTicketSaveBtn.textContent = "Add Buyer";
   raffleTicketCancelBtn?.classList.add("is-hidden");
@@ -1587,7 +1616,7 @@ function updateRaffleTicketAmountDefault(force = false) {
   const nextAmount = getDefaultRaffleAmountPaid(pricing, packageType, customCount);
   if (!raffleAmountPaidEl) return;
   const current = String(raffleAmountPaidEl.value || "").trim();
-  if (force || !current) raffleAmountPaidEl.value = nextAmount ? String(nextAmount) : "";
+  if (force || !current) raffleAmountPaidEl.value = nextAmount ? formatMoneyTypingValue(nextAmount, true) : "";
 }
 function renderRaffleTicketSales(event) {
   const raffle = normalizeType(event?.type) === "raffle";
@@ -1626,7 +1655,7 @@ function startEditingRaffleSale(event, saleId) {
   raffleBuyerContactEl.value = sale.contact || "";
   raffleTicketPackageEl.value = sale.packageType || "1";
   raffleCustomTicketCountEl.value = String(Math.max(1, Number(sale.ticketCount) || 1));
-  raffleAmountPaidEl.value = String(Number(sale.amountPaid) || 0);
+  raffleAmountPaidEl.value = formatMoneyTypingValue(Number(sale.amountPaid) || 0, true);
   raffleCustomTicketCountWrap?.classList.toggle("is-hidden", sale.packageType !== "custom");
   raffleTicketSaveBtn.textContent = "Save Buyer";
   raffleTicketCancelBtn?.classList.remove("is-hidden");
@@ -2077,9 +2106,7 @@ function wireInputs() {
   teamAccentEl.addEventListener("input", () => { state.team.accent = teamAccentEl.value; applyTheme(); });
   openGoalBtn.addEventListener("click", () => openGoal(true));
   cancelGoalBtn.addEventListener("click", () => openGoal(false));
-  goalAmountInputEl.addEventListener("blur", () => {
-    goalAmountInputEl.value = formatMoneyInputValue(goalAmountInputEl.value);
-  });
+  applyLiveMoneyFormatting(goalAmountInputEl, true);
   goalForm.addEventListener("submit", (e) => {
     e.preventDefault();
     state.team.goalTitle = goalTitleInputEl.value.trim();
@@ -2316,6 +2343,7 @@ function wireInputs() {
   openEventBtn.addEventListener("click", () => { resetEventFormState(); openEvent(true); });
   cancelEventBtn.addEventListener("click", () => { resetEventFormState(); openEvent(false); });
   closeEventDetailBtn.addEventListener("click", () => openEventDetail(false));
+  applyLiveMoneyFormatting(raffleAmountPaidEl, true);
   raffleTicketPackageEl?.addEventListener("change", () => updateRaffleTicketAmountDefault(true));
   raffleCustomTicketCountEl?.addEventListener("input", () => {
     if ((raffleTicketPackageEl?.value || "") !== "custom") return;
@@ -2333,7 +2361,7 @@ function wireInputs() {
     const contact = raffleBuyerContactEl?.value.trim() || "";
     const packageType = raffleTicketPackageEl?.value || "1";
     const ticketCount = getRafflePackageTicketCount(packageType, raffleCustomTicketCountEl?.value);
-    const amountPaid = Number(raffleAmountPaidEl?.value);
+    const amountPaid = parseMoneyInput(raffleAmountPaidEl?.value);
     if (!name || !contact) {
       openAppDialog({ title: "Ticket Buyer", message: "Enter the buyer name and contact.", confirmLabel: "OK", showCancel: false });
       return;
