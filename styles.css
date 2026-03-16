@@ -377,6 +377,10 @@ button:hover,
   grid-template-columns: 1fr auto auto;
 }
 
+.event-form-actions {
+  grid-template-columns: auto auto 1fr auto;
+}
+
 #resetTeamBtn {
   border-color: rgba(255, 112, 112, 0.72);
   background: linear-gradient(135deg, rgba(160, 20, 38, 0.92), rgba(92, 10, 22, 0.9));

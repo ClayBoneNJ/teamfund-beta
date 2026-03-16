@@ -116,6 +116,8 @@ const eventModalTitleEl = $("eventModalTitle");
 const cancelEventBtn = $("cancelEventBtn");
 const eventForm = $("eventForm");
 const saveEventBtn = $("saveEventBtn");
+const editEventEndBtn = $("editEventEndBtn");
+const editEventDeleteBtn = $("editEventDeleteBtn");
 const eventList = $("eventList");
 const eventDetailModal = $("eventDetailModal");
 const closeEventDetailBtn = $("closeEventDetailBtn");
@@ -146,8 +148,6 @@ const eventDetailScheduleGrid = $("eventDetailScheduleGrid");
 const eventDetailEditBtn = $("eventDetailEditBtn");
 const eventDetailUpdateRaisedBtn = $("eventDetailUpdateRaisedBtn");
 const eventDetailAddFlyerBtn = $("eventDetailAddFlyerBtn");
-const eventDetailEndBtn = $("eventDetailEndBtn");
-const eventDetailDeleteBtn = $("eventDetailDeleteBtn");
 const slotAssignModal = $("slotAssignModal");
 const slotAssignBackdrop = $("slotAssignBackdrop");
 const slotAssignTitleEl = $("slotAssignTitle");
@@ -1673,6 +1673,8 @@ function resetEventFormState() {
   closeCalendarPopover();
   if (eventModalTitleEl) eventModalTitleEl.textContent = "Create Event / Campaign";
   if (saveEventBtn) saveEventBtn.textContent = "Create Event";
+  editEventEndBtn?.classList.add("is-hidden");
+  editEventDeleteBtn?.classList.add("is-hidden");
 }
 function getRetainedFlyerCountForEditingEvent() {
   if (!editingEventId) return 0;
@@ -1695,6 +1697,7 @@ function enforceFlyerLimit(baseCount, incomingCount) {
 }
 function startEditingEvent(event) {
   if (!event) return;
+  const live = event.isLive !== false;
   editingEventId = event.id;
   editingEventRemovedFlyerIndices = new Set();
   if (eventModalTitleEl) eventModalTitleEl.textContent = "Edit Event";
@@ -1715,9 +1718,42 @@ function startEditingEvent(event) {
     clearEventFlyerPreviews();
   }
   closeCalendarPopover();
+  editEventEndBtn?.classList.toggle("is-hidden", !live);
+  editEventDeleteBtn?.classList.remove("is-hidden");
   openEventDetail(false);
   selectedEventId = event.id;
   openEvent(true);
+}
+function endSelectedEvent() {
+  const e = getEventById(selectedEventId);
+  if (!e || e.isLive === false) return;
+  e.isLive = false;
+  e.endedAt = new Date().toISOString();
+  renderEvents();
+  renderEventDetail();
+  saveState();
+  if (editingEventId === e.id) editEventEndBtn?.classList.add("is-hidden");
+}
+function deleteSelectedEvent() {
+  const e = getEventById(selectedEventId);
+  if (!e) return;
+  openAppDialog({
+    title: "Delete Event",
+    message: `Are you sure you want to delete "${e.title}"? This cannot be undone.`,
+    confirmLabel: "Delete",
+    cancelLabel: "Cancel",
+    onConfirm: () => {
+      state.events = state.events.filter((x) => x.id !== e.id);
+      selectedEventId = null;
+      renderEvents();
+      renderGoal();
+      resetEventFormState();
+      openEvent(false);
+      openEventDetail(false);
+      saveState();
+      return true;
+    },
+  });
 }
 function getEventById(id) {
   return state.events.find((e) => e.id === id) || null;
@@ -1890,7 +1926,6 @@ function renderEventDetail() {
   eventDetailEditBtn.classList.toggle("is-hidden", false);
   eventDetailUpdateRaisedBtn.classList.add("is-hidden");
   eventDetailAddFlyerBtn.classList.add("is-hidden");
-  eventDetailEndBtn.classList.toggle("is-hidden", !live);
 }
 function renderEvents() {
   syncAllRaisedTotals();
@@ -2574,31 +2609,8 @@ function wireInputs() {
     });
     input.click();
   });
-  eventDetailEndBtn.addEventListener("click", () => {
-    const e = getEventById(selectedEventId);
-    if (!e || e.isLive === false) return;
-    e.isLive = false;
-    e.endedAt = new Date().toISOString();
-    renderEvents(); renderEventDetail(); saveState();
-  });
-  eventDetailDeleteBtn.addEventListener("click", () => {
-    const e = getEventById(selectedEventId);
-    if (!e) return;
-    openAppDialog({
-      title: "Delete Event",
-      message: `Are you sure you want to delete "${e.title}"? This cannot be undone.`,
-      confirmLabel: "Delete",
-      cancelLabel: "Cancel",
-      onConfirm: () => {
-        state.events = state.events.filter((x) => x.id !== e.id);
-        renderEvents();
-        renderGoal();
-        openEventDetail(false);
-        saveState();
-        return true;
-      },
-    });
-  });
+  editEventEndBtn?.addEventListener("click", () => endSelectedEvent());
+  editEventDeleteBtn?.addEventListener("click", () => deleteSelectedEvent());
   eventForm.addEventListener("submit", async (e) => {
     e.preventDefault();
     const type = normalizeType(eventTypeEl.value);
