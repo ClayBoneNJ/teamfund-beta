@@ -262,6 +262,18 @@
       </div>
       <form id="eventForm" class="stack-md">
         <div class="stack-sm">
+          <label class="field-label" for="eventType">Type</label>
+          <select id="eventType" required>
+            <option value="">Select type</option>
+            <option value="canning">Canning</option>
+            <option value="raffle">Raffle</option>
+            <option value="restaurant_night">Restaurant Night</option>
+            <option value="merch">Merch</option>
+            <option value="other">Other</option>
+          </select>
+        </div>
+
+        <div class="stack-sm">
           <label class="field-label" for="eventTitle">Title</label>
           <input id="eventTitle" type="text" placeholder="Saturday Car Wash" required />
         </div>
@@ -282,18 +294,6 @@
               <input id="eventLeadEmail" type="email" placeholder="optional@email.com" />
             </div>
           </div>
-        </div>
-
-        <div class="stack-sm">
-          <label class="field-label" for="eventType">Type</label>
-          <select id="eventType" required>
-            <option value="">Select type</option>
-            <option value="canning">Canning</option>
-            <option value="raffle">Raffle</option>
-            <option value="restaurant_night">Restaurant Night</option>
-            <option value="merch">Merch</option>
-            <option value="other">Other</option>
-          </select>
         </div>
 
         <div id="eventTypeDetails" class="stack-md"></div>

@@ -297,6 +297,11 @@ input::placeholder {
   color: #7f8aba;
 }
 
+#eventTitle::placeholder {
+  color: rgba(127, 138, 186, 0.68);
+  font-weight: 400;
+}
+
 input[type="time"]::-webkit-calendar-picker-indicator {
   filter: invert(1) brightness(1.25);
   opacity: 0.95;

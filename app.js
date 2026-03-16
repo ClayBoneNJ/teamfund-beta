@@ -446,6 +446,15 @@ function formatCountdownFromMs(ms) {
   const seconds = totalSeconds % 60;
   return `${days}d ${hours}h ${minutes}m ${seconds}s remaining`;
 }
+function getSuggestedEventTitlePlaceholder(type) {
+  const normalized = normalizeType(type);
+  if (normalized === "canning") return "Community Canning Day";
+  if (normalized === "raffle") return "Spring Prize Raffle";
+  if (normalized === "restaurant_night") return "Restaurant Night at Bella's";
+  if (normalized === "merch") return "Team Hoodie Preorder";
+  if (normalized === "other") return "Saturday Car Wash";
+  return "Saturday Car Wash";
+}
 function renderRaffleDrawInfo(event) {
   const raffle = normalizeType(event?.type) === "raffle";
   if (!raffle || !eventDetailDrawWrapEl || !eventDetailDrawDateEl || !eventDetailDrawCountdownEl) {
@@ -1611,6 +1620,7 @@ function resetEventFormState() {
   editingEventRemovedFlyerIndices = new Set();
   eventFormRenderedType = "";
   eventForm.reset();
+  eventTitleEl.placeholder = getSuggestedEventTitlePlaceholder("");
   eventTypeDetailsEl.innerHTML = "";
   eventFlyersEl.value = "";
   eventFlyersFileNameEl.textContent = "No files selected";
@@ -1645,6 +1655,7 @@ function startEditingEvent(event) {
   if (eventModalTitleEl) eventModalTitleEl.textContent = "Edit Event";
   if (saveEventBtn) saveEventBtn.textContent = "Save Changes";
   eventTitleEl.value = event.title || "";
+  eventTitleEl.placeholder = getSuggestedEventTitlePlaceholder(event.type);
   eventLeadNameEl.value = event.lead?.name || "";
   eventLeadPhoneEl.value = event.lead?.phone || "";
   eventLeadEmailEl.value = event.lead?.email || "";
@@ -2136,7 +2147,7 @@ function wireInputs() {
         allowBackdropClose: false,
         onConfirm: () => {
           renderEventTypeDetails(type);
-          if (type === "canning" && !eventTitleEl.value.trim()) eventTitleEl.value = "Community Canning Day";
+          if (!eventTitleEl.value.trim()) eventTitleEl.placeholder = getSuggestedEventTitlePlaceholder(type);
           return true;
         },
         onCancel: () => {
@@ -2146,7 +2157,7 @@ function wireInputs() {
       return;
     }
     renderEventTypeDetails(type);
-    if (type === "canning" && !eventTitleEl.value.trim()) eventTitleEl.value = "Community Canning Day";
+    if (!eventTitleEl.value.trim()) eventTitleEl.placeholder = getSuggestedEventTitlePlaceholder(type);
   });
   eventTypeDetailsEl.addEventListener("click", (e) => {
     const raw = e.target;
