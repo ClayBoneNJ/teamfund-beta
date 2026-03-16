@@ -361,6 +361,12 @@ button:hover,
   display: inline-block;
 }
 
+.file-trigger.is-disabled {
+  opacity: 0.55;
+  pointer-events: none;
+  filter: grayscale(0.2);
+}
+
 .file-name {
   font-size: 0.8rem;
   color: #a6b2df;

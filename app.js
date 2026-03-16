@@ -1673,8 +1673,22 @@ function resetEventFormState() {
   closeCalendarPopover();
   if (eventModalTitleEl) eventModalTitleEl.textContent = "Create Event / Campaign";
   if (saveEventBtn) saveEventBtn.textContent = "Create Event";
+  setEventFormReadOnly(false);
   editEventEndBtn?.classList.add("is-hidden");
   editEventDeleteBtn?.classList.add("is-hidden");
+}
+function setEventFormReadOnly(readOnly) {
+  const locked = !!readOnly;
+  const fields = eventForm?.querySelectorAll("input, select, textarea");
+  fields?.forEach((field) => {
+    if (!field) return;
+    if (field === saveEventBtn || field === cancelEventBtn || field === editEventEndBtn || field === editEventDeleteBtn) return;
+    field.disabled = locked;
+  });
+  saveEventBtn?.classList.toggle("is-hidden", locked);
+  if (saveEventBtn) saveEventBtn.disabled = locked;
+  const fileTriggers = eventForm?.querySelectorAll(".file-trigger");
+  fileTriggers?.forEach((trigger) => trigger.classList.toggle("is-disabled", locked));
 }
 function getRetainedFlyerCountForEditingEvent() {
   if (!editingEventId) return 0;
@@ -1700,7 +1714,7 @@ function startEditingEvent(event) {
   const live = event.isLive !== false;
   editingEventId = event.id;
   editingEventRemovedFlyerIndices = new Set();
-  if (eventModalTitleEl) eventModalTitleEl.textContent = "Edit Event";
+  if (eventModalTitleEl) eventModalTitleEl.textContent = live ? "Edit Event" : "Ended Event";
   if (saveEventBtn) saveEventBtn.textContent = "Save Changes";
   eventTitleEl.value = event.title || "";
   eventTitleEl.placeholder = getSuggestedEventTitlePlaceholder(event.type);
@@ -1718,6 +1732,7 @@ function startEditingEvent(event) {
     clearEventFlyerPreviews();
   }
   closeCalendarPopover();
+  setEventFormReadOnly(!live);
   editEventEndBtn?.classList.toggle("is-hidden", !live);
   editEventDeleteBtn?.classList.remove("is-hidden");
   openEventDetail(false);
@@ -1727,12 +1742,25 @@ function startEditingEvent(event) {
 function endSelectedEvent() {
   const e = getEventById(selectedEventId);
   if (!e || e.isLive === false) return;
-  e.isLive = false;
-  e.endedAt = new Date().toISOString();
-  renderEvents();
-  renderEventDetail();
-  saveState();
-  if (editingEventId === e.id) editEventEndBtn?.classList.add("is-hidden");
+  openAppDialog({
+    title: "End Event",
+    message: "Are you sure? Changes cannot be made to ended events.",
+    confirmLabel: "End Event",
+    cancelLabel: "Cancel",
+    onConfirm: () => {
+      e.isLive = false;
+      e.endedAt = new Date().toISOString();
+      renderEvents();
+      renderEventDetail();
+      saveState();
+      if (editingEventId === e.id) {
+        setEventFormReadOnly(true);
+        if (eventModalTitleEl) eventModalTitleEl.textContent = "Ended Event";
+        editEventEndBtn?.classList.add("is-hidden");
+      }
+      return true;
+    },
+  });
 }
 function deleteSelectedEvent() {
   const e = getEventById(selectedEventId);
@@ -1924,6 +1952,7 @@ function renderEventDetail() {
   if (!eventDetailFlyersEl.children.length) eventDetailFlyersEl.textContent = "No flyer uploaded";
   renderCanningScheduleForEvent(e);
   eventDetailEditBtn.classList.toggle("is-hidden", false);
+  eventDetailEditBtn.textContent = live ? "Edit Event" : "Delete Event";
   eventDetailUpdateRaisedBtn.classList.add("is-hidden");
   eventDetailAddFlyerBtn.classList.add("is-hidden");
 }
@@ -2585,6 +2614,19 @@ function wireInputs() {
   eventDetailEditBtn.addEventListener("click", () => {
     const e = getEventById(selectedEventId);
     if (!e) return;
+    if (e.isLive === false) {
+      openAppDialog({
+        title: "Ended Event",
+        message: "Changes cannot be made to ended events.",
+        confirmLabel: "Continue",
+        cancelLabel: "Cancel",
+        onConfirm: () => {
+          startEditingEvent(e);
+          return true;
+        },
+      });
+      return;
+    }
     startEditingEvent(e);
   });
   eventDetailAddFlyerBtn.addEventListener("click", () => {
