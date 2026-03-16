@@ -1827,17 +1827,20 @@ function renderSlotAssignRoster() {
   const [date, timeRange] = selectedSlotKey.split("|");
   slotAssignTitleEl.textContent = `${formatDateLabel(date)} | ${timeRange || ""}`;
   slotAssignRosterEl.innerHTML = "";
-  const names = state.players.map((p) => (p.name || "").trim()).filter(Boolean);
-  if (!names.length) {
+  const players = state.players.filter((p) => String(p?.name || "").trim());
+  if (!players.length) {
     slotAssignRosterEl.innerHTML = `<p class="canning-slot-empty">No roster players available.</p>`;
     slotAssignClearBtn.classList.add("is-hidden");
     return;
   }
-  names.forEach((name) => {
+  players.forEach((player) => {
+    const name = String(player.name || "").trim();
+    const initials = getInitials(name, "P");
+    const avatar = player.photoDataUrl ? `<img src="${player.photoDataUrl}" alt="${escapeHtml(name)} photo" />` : `<span>${initials}</span>`;
     const btn = document.createElement("button");
     btn.type = "button";
-    btn.className = `slot-assign-player-btn${assignedNames.includes(name) ? " is-assigned" : ""}`;
-    btn.textContent = name;
+    btn.className = `player-pill-head slot-assign-player-btn${assignedNames.includes(name) ? " is-assigned" : ""}`;
+    btn.innerHTML = `<span class="player-avatar">${avatar}</span><strong>${escapeHtml(name)}${player.number ? ` #${escapeHtml(player.number)}` : ""}</strong>`;
     btn.addEventListener("click", () => {
       const nextAssigned = Array.isArray(slotAssignDraftNames) ? slotAssignDraftNames.slice() : [];
       const idx = nextAssigned.indexOf(name);

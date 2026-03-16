@@ -777,8 +777,6 @@ button:hover,
 .slot-assign-player-btn {
   width: 100%;
   text-align: left;
-  border-radius: 10px;
-  padding: 9px 10px;
 }
 
 .slot-assign-player-btn.is-assigned {
