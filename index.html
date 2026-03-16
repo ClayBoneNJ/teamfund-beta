@@ -1,0 +1,537 @@
+﻿<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TeamFund MVP</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700&family=Space+Grotesk:wght@600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <div class="bg-orb orb-a"></div>
+  <div class="bg-orb orb-b"></div>
+  <img id="logoWatermark" class="logo-watermark is-hidden" alt="" />
+
+  <main class="app-shell">
+    <div id="headerLogoLayer" class="header-logo-layer is-hidden">
+      <img id="headerLogo" alt="Team logo" />
+    </div>
+    <header class="app-header">
+      <h1>TeamFund</h1>
+      <p>Team-first fundraising dashboard</p>
+    </header>
+
+    <section class="grid">
+      <article class="card" id="team-card">
+        <div class="card-head">
+          <h2>Team Info</h2>
+          <button type="button" id="editTeamBtn" class="top-edit-btn" aria-label="Edit Team Info" title="Edit Team Info">&#8942;</button>
+        </div>
+
+        <div id="teamDisplay" class="team-display">
+          <div class="team-lines">
+            <div class="team-line-item">
+              <p class="meta-label">Team Name</p>
+              <p class="meta-value" id="teamNameValue">Not set</p>
+            </div>
+            <div class="team-line-item">
+              <p class="meta-label">Coach/Organizer</p>
+              <p class="meta-value" id="coachNameValue">Not set</p>
+            </div>
+            <div class="team-line-item is-hidden" id="assistantCoachRow">
+              <p class="meta-label">Assistant Coach</p>
+              <p class="meta-value" id="assistantCoachValue">Not set</p>
+            </div>
+            <div class="team-line-item is-hidden" id="teamManagerRow">
+              <p class="meta-label">Team Manager</p>
+              <p class="meta-value" id="teamManagerValue">Not set</p>
+            </div>
+            <div class="team-line-item is-hidden" id="teamParentRow">
+              <p class="meta-label">Team Parent</p>
+              <p class="meta-value" id="teamParentValue">Not set</p>
+            </div>
+          </div>
+          <div class="team-payment-grid">
+            <button type="button" id="teamVenmoQrBtn" class="team-payment-card">
+              <span class="team-payment-label">Venmo</span>
+              <span id="teamVenmoQrPreview" class="team-payment-preview">+</span>
+            </button>
+            <button type="button" id="teamZelleQrBtn" class="team-payment-card">
+              <span class="team-payment-label">Zelle</span>
+              <span id="teamZelleQrPreview" class="team-payment-preview">+</span>
+            </button>
+          </div>
+        </div>
+      </article>
+
+      <article class="card" id="roster-card">
+        <div class="card-head">
+          <h2>Roster</h2>
+          <span class="pill" id="playerCountPill">0 players</span>
+        </div>
+
+        <button type="button" id="openRosterBtn" class="display-action">Add Player</button>
+
+        <ul id="rosterList" class="list"></ul>
+      </article>
+
+      <article class="card card-lg" id="goal-card">
+        <div class="card-head">
+          <h2 id="goalHeaderTitle">Goal</h2>
+          <button type="button" id="openGoalBtn" class="top-edit-btn" aria-label="Edit Goal" title="Edit Goal">&#8942;</button>
+        </div>
+
+        <div class="progress-wrap" aria-label="Goal progress">
+          <div id="progressBar" class="progress-bar"></div>
+          <span class="progress-percent-label" id="percentPill">0%</span>
+        </div>
+
+        <div class="goal-progress-meta">
+          <p class="meta-value" id="goalRemainingLine">$0.00 / $0.00</p>
+        </div>
+
+        <div class="split gap-lg">
+          <div>
+            <p class="meta-label">Top Money Maker</p>
+            <p class="meta-value" id="topMoneyMaker">No events yet</p>
+          </div>
+        </div>
+      </article>
+
+      <article class="card" id="event-card">
+        <div class="card-head">
+          <h2>Events / Campaigns</h2>
+          <button type="button" id="openEventBtn">Create Event</button>
+        </div>
+
+        <ul id="eventList" class="list compact"></ul>
+      </article>
+    </section>
+  </main>
+
+  <div id="teamModal" class="modal is-hidden">
+    <div class="modal-backdrop" id="teamModalBackdrop"></div>
+    <section class="modal-panel card">
+      <div class="card-head">
+        <h2>Edit Team Info</h2>
+      </div>
+
+      <form id="teamForm" class="stack-md">
+        <div class="stack-sm">
+          <label class="field-label" for="teamName">Team Name</label>
+          <input id="teamName" type="text" placeholder="12U Wildcats" />
+        </div>
+        <div class="stack-sm">
+          <label class="field-label" for="coachName">Coach/Organizer</label>
+          <input id="coachName" type="text" placeholder="Coach Rivera" />
+        </div>
+        <div class="stack-sm">
+          <label class="field-label" for="assistantCoachName">Assistant Coach</label>
+          <input id="assistantCoachName" type="text" placeholder="Assistant Coach Name" />
+        </div>
+        <div class="stack-sm">
+          <label class="field-label" for="teamManagerName">Team Manager</label>
+          <input id="teamManagerName" type="text" placeholder="Team Manager Name" />
+        </div>
+        <div class="stack-sm">
+          <label class="field-label" for="teamParentName">Team Parent</label>
+          <input id="teamParentName" type="text" placeholder="Team Parent Name" />
+        </div>
+
+        <div class="split">
+          <div class="stack-sm">
+            <label class="field-label" for="teamColor1">Main Color 1</label>
+            <input id="teamColor1" type="color" value="#17335f" />
+          </div>
+          <div class="stack-sm">
+            <label class="field-label" for="teamColor2">Main Color 2</label>
+            <input id="teamColor2" type="color" value="#224a85" />
+          </div>
+        </div>
+
+        <div class="stack-sm">
+          <label class="field-label" for="teamAccentColor">Accent Color</label>
+          <input id="teamAccentColor" type="color" value="#9bb4d8" />
+        </div>
+
+        <div class="stack-sm">
+          <span class="field-label">Team Logo</span>
+          <div class="logo-upload">
+            <label for="teamLogo" class="file-trigger">Add Logo</label>
+            <span class="file-name" id="logoFileName">No file selected</span>
+            <input id="teamLogo" type="file" accept="image/*" />
+          </div>
+        </div>
+
+        <div class="stack-sm">
+          <span class="field-label">Payment QR Codes</span>
+          <div class="split">
+            <button type="button" id="editTeamVenmoQrBtn">Add Venmo QR</button>
+            <button type="button" id="editTeamZelleQrBtn">Add Zelle QR</button>
+          </div>
+        </div>
+
+        <div class="inline-form team-form-actions">
+          <button type="submit">Save Team Info</button>
+          <button type="button" id="resetTeamBtn">Reset All</button>
+          <button type="button" id="cancelTeamBtn">Cancel</button>
+        </div>
+      </form>
+    </section>
+  </div>
+
+  <input id="teamVenmoQrFile" type="file" accept="image/*" class="sr-only-file" />
+  <input id="teamZelleQrFile" type="file" accept="image/*" class="sr-only-file" />
+
+  <div id="goalModal" class="modal is-hidden">
+    <div class="modal-backdrop" id="goalModalBackdrop"></div>
+    <section class="modal-panel card">
+      <div class="card-head">
+        <h2>Edit Goal</h2>
+      </div>
+
+      <form id="goalForm" class="stack-md">
+        <div class="stack-sm">
+          <label class="field-label" for="goalTitleInput">Goal Title</label>
+          <input id="goalTitleInput" type="text" placeholder="Cooperstown Trip or New Uniforms" />
+        </div>
+        <div class="stack-sm">
+          <label class="field-label" for="goalAmountInput">Final Goal ($)</label>
+          <input id="goalAmountInput" type="number" min="0" step="100" placeholder="15000" />
+        </div>
+        <div class="inline-form">
+          <button type="submit">Save Goal</button>
+          <button type="button" id="cancelGoalBtn">Cancel</button>
+        </div>
+      </form>
+    </section>
+  </div>
+
+  <div id="rosterModal" class="modal is-hidden">
+    <div class="modal-backdrop" id="rosterModalBackdrop"></div>
+    <section class="modal-panel card">
+      <div class="card-head">
+        <h2 id="rosterModalTitle">Add Player</h2>
+      </div>
+      <form id="playerForm" class="stack-md">
+        <div class="stack-sm">
+          <label class="field-label" for="playerName">Player Name</label>
+          <input id="playerName" type="text" placeholder="Add player name" required />
+        </div>
+        <div class="split">
+          <div class="stack-sm">
+            <label class="field-label" for="playerNumber">Player Number</label>
+            <input id="playerNumber" type="text" placeholder="12" />
+          </div>
+          <div class="stack-sm">
+            <label class="field-label" for="contactName">Contact Name</label>
+            <input id="contactName" type="text" placeholder="Parent/Guardian Name" required />
+          </div>
+        </div>
+        <div class="stack-sm">
+          <label class="field-label" for="contactPhone">Contact Phone</label>
+          <input id="contactPhone" type="tel" placeholder="(555) 123-4567" required />
+        </div>
+        <div class="stack-sm">
+          <span class="field-label">Player Photo</span>
+          <div class="logo-upload">
+            <label for="playerPhoto" class="file-trigger">Add Photo</label>
+            <button type="button" id="cropPlayerPhotoBtn">Crop Photo</button>
+            <span class="file-name" id="playerPhotoFileName">No file selected</span>
+            <input id="playerPhoto" type="file" accept="image/*" />
+          </div>
+        </div>
+        <div id="playerPhotoPreviewWrap" class="player-photo-preview is-hidden">
+          <img id="playerPhotoPreviewImg" alt="Current player photo preview" />
+        </div>
+        <div class="inline-form">
+          <button type="submit" id="savePlayerBtn">Save Player</button>
+          <button type="button" id="cancelRosterBtn">Cancel</button>
+        </div>
+      </form>
+    </section>
+  </div>
+
+  <div id="eventModal" class="modal is-hidden">
+    <div class="modal-backdrop" id="eventModalBackdrop"></div>
+    <section class="modal-panel modal-panel-wide card">
+      <div class="card-head">
+        <h2 id="eventModalTitle">Create Event / Campaign</h2>
+      </div>
+      <form id="eventForm" class="stack-md">
+        <div class="stack-sm">
+          <label class="field-label" for="eventTitle">Title</label>
+          <input id="eventTitle" type="text" placeholder="Saturday Car Wash" required />
+        </div>
+
+        <div class="stack-sm lead-contact-group">
+          <p class="field-label lead-contact-title">Lead Contact</p>
+          <div class="lead-contact-grid">
+            <div class="stack-sm">
+              <label class="field-label" for="eventLeadName">Name</label>
+              <input id="eventLeadName" type="text" placeholder="Parent/Volunteer Name" required />
+            </div>
+            <div class="stack-sm">
+              <label class="field-label" for="eventLeadPhone">Phone</label>
+              <input id="eventLeadPhone" type="tel" placeholder="(555) 123-4567" required />
+            </div>
+            <div class="stack-sm">
+              <label class="field-label" for="eventLeadEmail">Email</label>
+              <input id="eventLeadEmail" type="email" placeholder="optional@email.com" />
+            </div>
+          </div>
+        </div>
+
+        <div class="stack-sm">
+          <label class="field-label" for="eventType">Type</label>
+          <select id="eventType" required>
+            <option value="">Select type</option>
+            <option value="canning">Canning</option>
+            <option value="raffle">Raffle</option>
+            <option value="restaurant_night">Restaurant Night</option>
+            <option value="merch">Merch</option>
+            <option value="other">Other</option>
+          </select>
+        </div>
+
+        <div id="eventTypeDetails" class="stack-md"></div>
+
+        <div class="stack-sm">
+          <span class="field-label">Flyer</span>
+          <div class="logo-upload">
+            <label for="eventFlyers" class="file-trigger">Upload Flyer</label>
+            <span class="file-name" id="eventFlyersFileName">No files selected</span>
+            <input id="eventFlyers" type="file" accept="image/*,.pdf" multiple />
+          </div>
+          <div id="eventFlyersPreview" class="flyer-preview-wrap is-hidden"></div>
+        </div>
+
+        <div class="inline-form">
+          <button type="submit" id="saveEventBtn">Create Event</button>
+          <button type="button" id="cancelEventBtn">Cancel</button>
+        </div>
+      </form>
+    </section>
+  </div>
+
+  <div id="eventDetailModal" class="modal is-hidden">
+    <div class="modal-backdrop" id="eventDetailBackdrop"></div>
+    <section class="modal-panel modal-panel-wide card">
+      <div class="card-head">
+        <h2 id="eventDetailTitle">Event Details</h2>
+        <button type="button" id="closeEventDetailBtn">Close</button>
+      </div>
+      <div class="stack-md">
+        <div id="eventDetailInfoBlock" class="event-detail-info-block">
+          <p id="eventDetailBlockTitle" class="event-detail-block-title">-</p>
+          <p id="eventDetailMeta" class="event-detail-block-meta">-</p>
+          <p id="eventDetailLead" class="event-detail-block-lead">-</p>
+        </div>
+        <p id="eventDetailSummary">-</p>
+        <div id="eventDetailDrawWrap" class="raffle-draw-highlight is-hidden">
+          <p class="raffle-draw-label">Drawing Date</p>
+          <p class="raffle-draw-date" id="eventDetailDrawDate">TBD</p>
+          <p class="raffle-draw-countdown" id="eventDetailDrawCountdown">Countdown unavailable</p>
+        </div>
+        <div>
+          <p class="meta-label">Notes</p>
+          <p id="eventDetailNotes">-</p>
+        </div>
+        <div>
+          <p class="meta-label">Flyer</p>
+          <div id="eventDetailFlyers" class="event-flyers"></div>
+        </div>
+        <div id="eventDetailTicketSalesWrap" class="stack-sm is-hidden">
+          <p class="meta-label">Ticket Sales</p>
+          <div id="eventDetailTicketSummary" class="raffle-ticket-summary"></div>
+          <form id="raffleTicketForm" class="raffle-ticket-form">
+            <div class="split">
+              <div class="stack-sm">
+                <label class="field-label" for="raffleBuyerName">Buyer Name</label>
+                <input id="raffleBuyerName" type="text" placeholder="Name" />
+              </div>
+              <div class="stack-sm">
+                <label class="field-label" for="raffleBuyerContact">Contact</label>
+                <input id="raffleBuyerContact" type="text" placeholder="Phone or email" />
+              </div>
+            </div>
+            <div class="raffle-ticket-form-grid">
+              <div class="stack-sm">
+                <label class="field-label" for="raffleTicketPackage">Ticket Bundle</label>
+                <select id="raffleTicketPackage">
+                  <option value="1">1 ticket</option>
+                  <option value="5">5 tickets</option>
+                  <option value="10">10 tickets</option>
+                  <option value="custom">Custom</option>
+                </select>
+              </div>
+              <div id="raffleCustomTicketCountWrap" class="stack-sm is-hidden">
+                <label class="field-label" for="raffleCustomTicketCount">Custom Count</label>
+                <input id="raffleCustomTicketCount" type="number" min="1" step="1" value="1" />
+              </div>
+              <div class="stack-sm">
+                <label class="field-label" for="raffleAmountPaid">Amount Paid</label>
+                <input id="raffleAmountPaid" type="number" min="0" step="0.01" placeholder="0.00" />
+              </div>
+            </div>
+            <div class="raffle-ticket-form-actions">
+              <button type="submit" id="raffleTicketSaveBtn" class="event-end-btn">Add Buyer</button>
+              <button type="button" id="raffleTicketCancelBtn" class="event-end-btn is-hidden">Cancel Edit</button>
+            </div>
+          </form>
+          <div id="eventDetailTicketSalesList" class="raffle-ticket-sales-list"></div>
+        </div>
+        <div id="eventDetailScheduleWrap" class="stack-sm is-hidden">
+          <p class="meta-label">Canning Schedule</p>
+          <div id="eventDetailScheduleGrid" class="canning-schedule-grid"></div>
+        </div>
+        <div class="event-actions" id="eventDetailActions">
+          <button type="button" id="eventDetailEditBtn" class="event-end-btn">Edit Event</button>
+          <button type="button" id="eventDetailUpdateRaisedBtn" class="event-end-btn">Update Raised</button>
+          <button type="button" id="eventDetailAddFlyerBtn" class="event-end-btn">Add Flyer</button>
+          <button type="button" id="eventDetailEndBtn" class="event-end-btn">End Event</button>
+          <button type="button" id="eventDetailDeleteBtn" class="event-end-btn">Delete Event</button>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <div id="slotAssignModal" class="modal is-hidden">
+    <div class="modal-backdrop" id="slotAssignBackdrop"></div>
+    <section class="modal-panel card">
+      <div class="card-head">
+        <h2>Assign Time Block</h2>
+      </div>
+      <div class="stack-md">
+        <p class="meta-value" id="slotAssignTitle">-</p>
+        <p class="meta-label">Choose player(s)</p>
+        <div id="slotAssignRoster" class="slot-assign-roster"></div>
+        <div class="inline-form">
+          <button type="button" id="slotAssignSaveBtn">Save</button>
+          <button type="button" id="slotAssignCancelBtn">Cancel</button>
+          <button type="button" id="slotAssignClearBtn">Clear Assignment</button>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <div id="appDialogModal" class="modal is-hidden">
+    <div class="modal-backdrop" id="appDialogBackdrop"></div>
+    <section class="modal-panel card">
+      <div class="card-head">
+        <h2 id="appDialogTitle">Message</h2>
+      </div>
+      <div class="stack-md">
+        <p id="appDialogMessage">-</p>
+        <div id="appDialogInputWrap" class="stack-sm is-hidden">
+          <label id="appDialogInputLabel" class="field-label" for="appDialogInput">Value</label>
+          <div id="appDialogInputFieldWrap" class="prefixed-input-wrap">
+            <span id="appDialogInputPrefix" class="input-prefix" aria-hidden="true">$</span>
+            <input id="appDialogInput" type="text" />
+          </div>
+        </div>
+        <div id="appDialogInput2Wrap" class="stack-sm is-hidden">
+          <label id="appDialogInput2Label" class="field-label" for="appDialogInput2">Value</label>
+          <div id="appDialogInput2FieldWrap" class="prefixed-input-wrap">
+            <span id="appDialogInput2Prefix" class="input-prefix" aria-hidden="true">$</span>
+            <input id="appDialogInput2" type="text" />
+          </div>
+        </div>
+        <div class="inline-form">
+          <button type="button" id="appDialogExtraBtn" class="is-hidden">More</button>
+          <button type="button" id="appDialogTertiaryBtn" class="is-hidden">Other</button>
+          <button type="button" id="appDialogConfirmBtn">OK</button>
+          <button type="button" id="appDialogCancelBtn">Cancel</button>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <div id="calendarPopover" class="calendar-popover is-hidden" role="dialog" aria-label="Select date">
+    <div class="calendar-head">
+      <button type="button" id="calendarPrevBtn" class="calendar-nav-btn" aria-label="Previous month">&lt;</button>
+      <strong id="calendarMonthLabel"></strong>
+      <button type="button" id="calendarNextBtn" class="calendar-nav-btn" aria-label="Next month">&gt;</button>
+    </div>
+    <div class="calendar-weekdays" aria-hidden="true">
+      <span>Sun</span><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span>
+    </div>
+    <div id="calendarGrid" class="calendar-grid"></div>
+    <p id="calendarHelper" class="calendar-helper">Select a start date.</p>
+    <button type="button" id="calendarDoneBtn" class="calendar-done-btn">Done</button>
+  </div>
+
+  <div id="flyerPreviewModal" class="modal is-hidden">
+    <div class="modal-backdrop" id="flyerPreviewBackdrop"></div>
+    <section class="modal-panel flyer-preview-modal-panel card">
+      <div class="card-head">
+        <h2 id="flyerPreviewTitle">Flyer Preview</h2>
+        <button type="button" id="closeFlyerPreviewBtn">Close</button>
+      </div>
+      <div class="flyer-preview-large-wrap">
+        <img id="flyerPreviewLargeImg" alt="Full-size flyer preview" />
+        <img id="flyerPreviewOverlayLogo" class="flyer-preview-overlay-logo is-hidden" alt="" />
+        <iframe id="flyerPreviewLargeFrame" title="Flyer document preview" class="is-hidden"></iframe>
+      </div>
+    </section>
+  </div>
+
+  <div id="playerDetailModal" class="player-popover is-hidden">
+    <section class="modal-panel card">
+      <div class="card-head">
+        <h2>Player Details</h2>
+      </div>
+      <div class="stack-md">
+        <div class="player-photo-large" id="detailPlayerPhoto"></div>
+        <div>
+          <p class="meta-label">Name</p>
+          <p class="meta-value" id="detailPlayerName">-</p>
+        </div>
+        <div>
+          <p class="meta-label">Number</p>
+          <p class="meta-value" id="detailPlayerNumber">-</p>
+        </div>
+        <div>
+          <p class="meta-label">Contact</p>
+          <p class="meta-value" id="detailContactName">-</p>
+        </div>
+        <div>
+          <p class="meta-label">Phone</p>
+          <p class="meta-value" id="detailContactPhone">-</p>
+        </div>
+        <div class="inline-form">
+          <button type="button" id="editPlayerFromDetailBtn">Edit Player</button>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <div id="photoCropModal" class="modal is-hidden">
+    <div class="modal-backdrop"></div>
+    <section class="modal-panel card">
+      <div class="card-head">
+        <h2>Crop Player Photo</h2>
+      </div>
+      <div class="stack-md">
+        <div class="crop-canvas-wrap">
+          <canvas id="cropCanvas" width="320" height="320" aria-label="Photo crop area"></canvas>
+        </div>
+        <div class="stack-sm">
+          <label class="field-label" for="cropZoom">Zoom</label>
+          <input id="cropZoom" type="range" min="1" max="3" step="0.01" value="1" />
+        </div>
+        <div class="inline-form">
+          <button type="button" id="applyCropBtn">Apply Crop</button>
+          <button type="button" id="cancelCropBtn">Cancel</button>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/qrcode/build/qrcode.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <script src="./app.js"></script>
+</body>
+</html>
