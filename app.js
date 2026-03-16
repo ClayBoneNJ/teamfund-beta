@@ -5,17 +5,17 @@ const DB_STORE = "kv";
 const DB_STATE_KEY = "state";
 const MAX_FLYERS_PER_EVENT = 2;
 const DEFAULT_TEAM_STATE = {
-  name: "RiverDogs Grey",
-  coach: "Coach Bill",
+  name: "",
+  coach: "",
   assistantCoach: "",
   teamManager: "",
   teamParent: "",
   goalTitle: "",
   goalAmount: 0,
-  color1: "#17335f",
-  color2: "#224a85",
-  accent: "#9bb4d8",
-  logoDataUrl: "./riverdog cybertron.png",
+  color1: "#ffffff",
+  color2: "#ffffff",
+  accent: "#ffffff",
+  logoDataUrl: "",
   venmoQr: null,
   zelleQr: null,
 };
