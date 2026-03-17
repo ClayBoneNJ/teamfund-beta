@@ -347,6 +347,14 @@ button:hover,
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.28), 0 20px 38px rgba(2, 5, 15, 0.8), 0 6px 14px rgba(0, 0, 0, 0.62);
 }
 
+button:disabled,
+.file-trigger.is-disabled {
+  opacity: 0.55;
+  pointer-events: none;
+  filter: grayscale(0.2);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12), 0 8px 18px rgba(2, 5, 15, 0.45);
+}
+
 .logo-upload {
   display: flex;
   align-items: center;
@@ -359,12 +367,6 @@ button:hover,
 
 .file-trigger {
   display: inline-block;
-}
-
-.file-trigger.is-disabled {
-  opacity: 0.55;
-  pointer-events: none;
-  filter: grayscale(0.2);
 }
 
 .file-name {
@@ -1174,6 +1176,20 @@ button:hover,
   color: #c8d3fa;
 }
 
+.detail-linked-player-list {
+  display: grid;
+  gap: 8px;
+}
+
+.detail-linked-player-list .player-pill {
+  display: block;
+  padding: 0;
+}
+
+.detail-linked-player-list .player-pill-head {
+  padding: 7px 10px;
+}
+
 .player-photo-large {
   width: 108px;
   height: 108px;
@@ -1273,6 +1289,116 @@ button:hover,
 
 .team-line-item .meta-label {
   margin-bottom: 2px;
+}
+
+.team-admin-list,
+.admin-editor-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+}
+
+.team-admin-list .player-pill {
+  display: block;
+  padding: 8px 9px;
+}
+
+.admin-pill-head {
+  align-items: center;
+}
+
+.admin-pill-copy {
+  display: grid;
+  gap: 2px;
+  text-align: left;
+}
+
+.admin-pill-copy strong {
+  color: #eff3ff;
+  font-size: 1.05rem;
+}
+
+.admin-pill-copy span {
+  color: #c8d3fa;
+  font-size: 0.84rem;
+}
+
+.admin-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.admin-editor-item {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 12px;
+  align-items: center;
+  padding: 11px 12px;
+  border: 1px solid rgba(var(--team-accent-rgb), 0.28);
+  border-radius: 14px;
+  background: rgba(7, 11, 28, 0.58);
+}
+
+.admin-editor-main {
+  display: grid;
+  gap: 2px;
+}
+
+.admin-editor-main strong {
+  color: #f3f6ff;
+}
+
+.admin-editor-main span {
+  color: #a6b2df;
+  font-size: 0.83rem;
+}
+
+.admin-editor-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.admin-editor-actions button {
+  padding: 8px 10px;
+}
+
+.danger-btn {
+  border-color: rgba(255, 112, 112, 0.72);
+  background: linear-gradient(135deg, rgba(160, 20, 38, 0.92), rgba(92, 10, 22, 0.9));
+}
+
+.admin-linked-summary {
+  margin: 0;
+  color: #a6b2df;
+  font-size: 0.83rem;
+}
+
+.admin-linked-wrap {
+  border: 1px solid rgba(var(--team-accent-rgb), 0.28);
+  border-radius: 14px;
+  padding: 10px;
+  background: rgba(7, 11, 28, 0.55);
+}
+
+.admin-linked-player-list {
+  display: grid;
+  gap: 8px;
+}
+
+.admin-linked-player-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #dfe7ff;
+}
+
+.admin-linked-player-option input {
+  width: auto;
+  margin: 0;
 }
 
 .team-payment-grid {
@@ -1757,6 +1883,18 @@ button:hover,
 
   .inline-form {
     grid-template-columns: 1fr;
+  }
+
+  .admin-editor-item {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-editor-actions {
+    width: 100%;
+  }
+
+  .admin-editor-actions button {
+    flex: 1 1 0;
   }
 
   .event-meta-box {

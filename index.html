@@ -33,20 +33,9 @@
         <div id="teamDisplay" class="team-display">
           <div class="team-lines">
             <div class="team-line-item">
-              <p class="meta-label">Coach/Organizer</p>
-              <p class="meta-value" id="coachNameValue">Not set</p>
-            </div>
-            <div class="team-line-item is-hidden" id="assistantCoachRow">
-              <p class="meta-label">Assistant Coach</p>
-              <p class="meta-value" id="assistantCoachValue">Not set</p>
-            </div>
-            <div class="team-line-item is-hidden" id="teamManagerRow">
-              <p class="meta-label">Team Manager</p>
-              <p class="meta-value" id="teamManagerValue">Not set</p>
-            </div>
-            <div class="team-line-item is-hidden" id="teamParentRow">
-              <p class="meta-label">Team Parent</p>
-              <p class="meta-value" id="teamParentValue">Not set</p>
+              <p class="meta-label">Team Admins</p>
+              <p class="meta-value is-hidden" id="teamAdminsEmpty">No admins added yet</p>
+              <ul id="teamAdminsList" class="team-admin-list"></ul>
             </div>
           </div>
           <div class="team-payment-grid">
@@ -128,20 +117,12 @@
           <input id="teamHometown" type="text" placeholder="Sayreville, NJ" />
         </div>
         <div class="stack-sm">
-          <label class="field-label" for="coachName">Coach/Organizer</label>
-          <input id="coachName" type="text" placeholder="Coach Rivera" />
-        </div>
-        <div class="stack-sm">
-          <label class="field-label" for="assistantCoachName">Assistant Coach</label>
-          <input id="assistantCoachName" type="text" placeholder="Assistant Coach Name" />
-        </div>
-        <div class="stack-sm">
-          <label class="field-label" for="teamManagerName">Team Manager</label>
-          <input id="teamManagerName" type="text" placeholder="Team Manager Name" />
-        </div>
-        <div class="stack-sm">
-          <label class="field-label" for="teamParentName">Team Parent</label>
-          <input id="teamParentName" type="text" placeholder="Team Parent Name" />
+          <span class="field-label">Team Admins</span>
+          <div class="admin-toolbar">
+            <button type="button" id="openAdminBtn">Add Admin</button>
+            <span id="adminCountText" class="file-name">No admins added yet</span>
+          </div>
+          <ul id="adminEditorList" class="admin-editor-list"></ul>
         </div>
 
         <div class="split">
@@ -188,6 +169,67 @@
 
   <input id="teamVenmoQrFile" type="file" accept="image/*" class="sr-only-file" />
   <input id="teamZelleQrFile" type="file" accept="image/*" class="sr-only-file" />
+
+  <div id="adminModal" class="modal is-hidden">
+    <div class="modal-backdrop"></div>
+    <section class="modal-panel card">
+      <div class="card-head">
+        <h2 id="adminModalTitle">Add Admin</h2>
+      </div>
+      <form id="adminForm" class="stack-md">
+        <div class="stack-sm">
+          <label class="field-label" for="adminRole">Role</label>
+          <select id="adminRole" required>
+            <option value="head_coach">Head Coach</option>
+            <option value="assistant_coach">Assistant Coach</option>
+            <option value="team_manager">Team Manager</option>
+            <option value="team_parent">Team Parent</option>
+            <option value="custom">Custom Label</option>
+          </select>
+        </div>
+        <div id="adminCustomLabelWrap" class="stack-sm is-hidden">
+          <label class="field-label" for="adminCustomLabel">Custom Label</label>
+          <input id="adminCustomLabel" type="text" placeholder="Fundraising Chair" />
+        </div>
+        <div class="stack-sm">
+          <label class="field-label" for="adminName">Name</label>
+          <input id="adminName" type="text" placeholder="Coach Rivera" required />
+        </div>
+        <div class="split">
+          <div class="stack-sm">
+            <label class="field-label" for="adminPhone">Phone</label>
+            <input id="adminPhone" type="tel" placeholder="(555) 123-4567" />
+          </div>
+          <div class="stack-sm">
+            <label class="field-label" for="adminEmail">Email</label>
+            <input id="adminEmail" type="email" placeholder="optional@email.com" />
+          </div>
+        </div>
+        <div class="stack-sm">
+          <span class="field-label">Picture</span>
+          <div class="logo-upload">
+            <label for="adminPhoto" class="file-trigger">Add Photo</label>
+            <span class="file-name" id="adminPhotoFileName">No file selected</span>
+            <input id="adminPhoto" type="file" accept="image/*" />
+          </div>
+        </div>
+        <div id="adminPhotoPreviewWrap" class="player-photo-preview is-hidden">
+          <img id="adminPhotoPreviewImg" alt="Admin photo preview" />
+        </div>
+        <div class="stack-sm">
+          <button type="button" id="toggleAdminLinksBtn">No players on roster</button>
+          <p id="adminLinkedPlayersSummary" class="admin-linked-summary">No linked players selected.</p>
+          <div id="adminLinkedPlayersWrap" class="admin-linked-wrap is-hidden">
+            <div id="adminLinkedPlayersList" class="admin-linked-player-list"></div>
+          </div>
+        </div>
+        <div class="inline-form">
+          <button type="submit" id="saveAdminBtn">Save Admin</button>
+          <button type="button" id="cancelAdminBtn">Cancel</button>
+        </div>
+      </form>
+    </section>
+  </div>
 
   <div id="goalModal" class="modal is-hidden">
     <div class="modal-backdrop" id="goalModalBackdrop"></div>
@@ -507,6 +549,37 @@
         </div>
         <div class="inline-form">
           <button type="button" id="editPlayerFromDetailBtn">Edit Player</button>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <div id="adminDetailModal" class="player-popover is-hidden">
+    <section class="modal-panel card">
+      <div class="card-head">
+        <h2>Admin Details</h2>
+      </div>
+      <div class="stack-md">
+        <div class="player-photo-large" id="detailAdminPhoto"></div>
+        <div>
+          <p class="meta-label">Name</p>
+          <p class="meta-value" id="detailAdminName">-</p>
+        </div>
+        <div>
+          <p class="meta-label">Title</p>
+          <p class="meta-value" id="detailAdminTitle">-</p>
+        </div>
+        <div>
+          <p class="meta-label">Phone</p>
+          <p class="meta-value" id="detailAdminPhone">-</p>
+        </div>
+        <div>
+          <p class="meta-label">Email</p>
+          <p class="meta-value" id="detailAdminEmail">-</p>
+        </div>
+        <div>
+          <p class="meta-label">Linked Players</p>
+          <div id="detailAdminLinkedPlayers" class="detail-linked-player-list">-</div>
         </div>
       </div>
     </section>

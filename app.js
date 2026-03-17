@@ -8,6 +8,7 @@ const DEFAULT_TEAM_STATE = {
   name: "",
   division: "",
   hometown: "",
+  admins: [],
   coach: "",
   assistantCoach: "",
   teamManager: "",
@@ -25,6 +26,7 @@ const RESET_TEAM_STATE = {
   name: "",
   division: "",
   hometown: "",
+  admins: [],
   coach: "",
   assistantCoach: "",
   teamManager: "",
@@ -54,10 +56,30 @@ const teamModal = $("teamModal");
 const teamNameEl = $("teamName");
 const teamDivisionEl = $("teamDivision");
 const teamHometownEl = $("teamHometown");
-const coachNameEl = $("coachName");
-const assistantCoachNameEl = $("assistantCoachName");
-const teamManagerNameEl = $("teamManagerName");
-const teamParentNameEl = $("teamParentName");
+const teamAdminsListEl = $("teamAdminsList");
+const teamAdminsEmptyEl = $("teamAdminsEmpty");
+const openAdminBtn = $("openAdminBtn");
+const adminCountTextEl = $("adminCountText");
+const adminEditorListEl = $("adminEditorList");
+const adminModal = $("adminModal");
+const adminModalTitleEl = $("adminModalTitle");
+const adminForm = $("adminForm");
+const adminRoleEl = $("adminRole");
+const adminCustomLabelWrapEl = $("adminCustomLabelWrap");
+const adminCustomLabelEl = $("adminCustomLabel");
+const adminNameEl = $("adminName");
+const adminPhoneEl = $("adminPhone");
+const adminEmailEl = $("adminEmail");
+const adminPhotoEl = $("adminPhoto");
+const adminPhotoFileNameEl = $("adminPhotoFileName");
+const adminPhotoPreviewWrapEl = $("adminPhotoPreviewWrap");
+const adminPhotoPreviewImgEl = $("adminPhotoPreviewImg");
+const toggleAdminLinksBtn = $("toggleAdminLinksBtn");
+const adminLinkedPlayersSummaryEl = $("adminLinkedPlayersSummary");
+const adminLinkedPlayersWrapEl = $("adminLinkedPlayersWrap");
+const adminLinkedPlayersListEl = $("adminLinkedPlayersList");
+const saveAdminBtn = $("saveAdminBtn");
+const cancelAdminBtn = $("cancelAdminBtn");
 const teamColor1El = $("teamColor1");
 const teamColor2El = $("teamColor2");
 const teamAccentEl = $("teamAccentColor");
@@ -109,6 +131,13 @@ const detailPlayerNumber = $("detailPlayerNumber");
 const detailContactName = $("detailContactName");
 const detailContactPhone = $("detailContactPhone");
 const editPlayerFromDetailBtn = $("editPlayerFromDetailBtn");
+const adminDetailModal = $("adminDetailModal");
+const detailAdminPhoto = $("detailAdminPhoto");
+const detailAdminName = $("detailAdminName");
+const detailAdminTitle = $("detailAdminTitle");
+const detailAdminPhone = $("detailAdminPhone");
+const detailAdminEmail = $("detailAdminEmail");
+const detailAdminLinkedPlayers = $("detailAdminLinkedPlayers");
 
 const openEventBtn = $("openEventBtn");
 const eventModal = $("eventModal");
@@ -200,8 +229,13 @@ const calendarDoneBtn = $("calendarDoneBtn");
 let editingPlayerIndex = null;
 let selectedPlayerIndex = null;
 let selectedPlayerAnchor = null;
+let selectedAdminAnchor = null;
 let pendingPlayerPhotoDataUrl = "";
 let rosterPreviewObjectUrl = "";
+let editingAdminIndex = null;
+let pendingAdminPhotoDataUrl = "";
+let adminPreviewObjectUrl = "";
+let teamAdminDraft = [];
 let calendarAnchorEl = null;
 const calendarView = { year: 0, month: 0 };
 const calendarDraft = { startDate: "", endDate: "" };
@@ -227,6 +261,13 @@ let stateSaveWarned = false;
 
 const cropState = { image: null, zoom: 1, baseScale: 1, offsetX: 0, offsetY: 0, dragging: false, lastX: 0, lastY: 0 };
 const PDFJS_WORKER_SRC = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+const ADMIN_ROLE_OPTIONS = [
+  { value: "head_coach", label: "Head Coach" },
+  { value: "assistant_coach", label: "Assistant Coach" },
+  { value: "team_manager", label: "Team Manager" },
+  { value: "team_parent", label: "Team Parent" },
+  { value: "custom", label: "Custom Label" },
+];
 
 const escapeHtml = (v) => String(v || "").replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;").replaceAll("'", "&#39;");
 const formatMoney = (v) => new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", minimumFractionDigits: 2 }).format(v || 0);
@@ -298,6 +339,51 @@ function getInitials(name, fallback = "P") {
   const initials = String(name || "").split(" ").filter(Boolean).slice(0, 2).map((x) => x[0].toUpperCase()).join("");
   return initials || fallback;
 }
+function getAdminRoleLabel(role, customLabel = "") {
+  if (role === "custom") return String(customLabel || "").trim() || "Custom Admin";
+  return ADMIN_ROLE_OPTIONS.find((option) => option.value === role)?.label || "Admin";
+}
+function normalizeAdminRole(role) {
+  return ADMIN_ROLE_OPTIONS.some((option) => option.value === role) ? role : "custom";
+}
+function getPlayerId(player) {
+  return String(player?.id || "").trim() || crypto.randomUUID();
+}
+function normalizeAdminRecord(admin) {
+  const role = normalizeAdminRole(admin?.role);
+  return {
+    id: String(admin?.id || "").trim() || crypto.randomUUID(),
+    role,
+    customLabel: role === "custom" ? String(admin?.customLabel || "").trim() : "",
+    name: String(admin?.name || "").trim(),
+    phone: formatPhone(admin?.phone || ""),
+    email: String(admin?.email || "").trim(),
+    photoDataUrl: String(admin?.photoDataUrl || "").trim(),
+    linkedPlayerIds: Array.isArray(admin?.linkedPlayerIds) ? admin.linkedPlayerIds.map((id) => String(id || "").trim()).filter(Boolean) : [],
+  };
+}
+function migrateLegacyAdmins(team) {
+  const migrated = [];
+  const pushLegacyAdmin = (role, name) => {
+    const cleanName = String(name || "").trim();
+    if (!cleanName) return;
+    migrated.push(normalizeAdminRecord({ role, name: cleanName }));
+  };
+  pushLegacyAdmin("head_coach", team?.coach);
+  pushLegacyAdmin("assistant_coach", team?.assistantCoach);
+  pushLegacyAdmin("team_manager", team?.teamManager);
+  pushLegacyAdmin("team_parent", team?.teamParent);
+  return migrated;
+}
+function getNormalizedAdmins(team) {
+  const rawAdmins = Array.isArray(team?.admins) ? team.admins : [];
+  if (rawAdmins.length) return rawAdmins.map((admin) => normalizeAdminRecord(admin)).filter((admin) => admin.name);
+  return migrateLegacyAdmins(team);
+}
+function getLinkedPlayerNames(linkedPlayerIds = []) {
+  const selectedIds = new Set(linkedPlayerIds.map((id) => String(id || "").trim()).filter(Boolean));
+  return state.players.filter((player) => selectedIds.has(player.id)).map((player) => player.name || `Player ${player.number || ""}`.trim()).filter(Boolean);
+}
 function parseIsoDate(iso) {
   const m = String(iso || "").match(/^(\d{4})-(\d{2})-(\d{2})$/);
   if (!m) return null;
@@ -346,6 +432,7 @@ function applyParsedState(parsed) {
   if (!parsed || typeof parsed !== "object") return;
   state.players = Array.isArray(parsed.players) ? parsed.players.map((player) => ({
     ...player,
+    id: getPlayerId(player),
     contactPhone: formatPhone(player?.contactPhone || ""),
   })) : [];
   state.events = Array.isArray(parsed.events) ? parsed.events.map((e) => ({
@@ -358,12 +445,17 @@ function applyParsedState(parsed) {
     isLive: e.isLive !== false,
   })) : [];
   syncAllRaisedTotals();
-  state.team = { ...DEFAULT_TEAM_STATE, ...state.team, ...(parsed.team || {}) };
+  const parsedTeam = { ...DEFAULT_TEAM_STATE, ...state.team, ...(parsed.team || {}) };
+  parsedTeam.admins = getNormalizedAdmins(parsedTeam);
+  state.team = parsedTeam;
 }
 function resetAllData() {
   state.players = [];
   state.events = [];
   state.team = { ...RESET_TEAM_STATE };
+  teamAdminDraft = [];
+  editingAdminIndex = null;
+  pendingAdminPhotoDataUrl = "";
   editingPlayerIndex = null;
   selectedPlayerIndex = null;
   selectedPlayerAnchor = null;
@@ -371,15 +463,14 @@ function resetAllData() {
   teamNameEl.value = state.team.name;
   teamDivisionEl.value = state.team.division;
   teamHometownEl.value = state.team.hometown;
-  coachNameEl.value = state.team.coach;
-  assistantCoachNameEl.value = state.team.assistantCoach;
-  teamManagerNameEl.value = state.team.teamManager;
-  teamParentNameEl.value = state.team.teamParent;
   teamColor1El.value = state.team.color1;
   teamColor2El.value = state.team.color2;
   teamAccentEl.value = state.team.accent;
   logoFileNameEl.textContent = "No file selected";
   teamLogoEl.value = "";
+  adminForm.reset();
+  adminPhotoEl.value = "";
+  adminPhotoFileNameEl.textContent = "No file selected";
   goalTitleInputEl.value = "";
   goalAmountInputEl.value = "";
   playerForm.reset();
@@ -393,6 +484,7 @@ function resetAllData() {
   openEventDetail(false);
   openGoal(false);
   openRoster(false);
+  openAdmin(false);
   applyTheme();
   renderRoster();
   renderEvents();
@@ -954,6 +1046,27 @@ async function readEventFlyerDataUrl(file) {
   ctx.drawImage(img, 0, 0, w, h);
   return canvas.toDataURL("image/jpeg", 0.84);
 }
+async function readPlayerPhotoData(file) {
+  const isImage = String(file?.type || "").startsWith("image/");
+  if (!isImage) return readFileAsDataUrl(file);
+  const src = await readFileAsDataUrl(file);
+  try {
+    const img = await loadImageFromSrc(src);
+    const maxSide = 1200;
+    const scale = Math.min(1, maxSide / Math.max(img.width, img.height));
+    const w = Math.max(1, Math.round(img.width * scale));
+    const h = Math.max(1, Math.round(img.height * scale));
+    const canvas = document.createElement("canvas");
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return src;
+    ctx.drawImage(img, 0, 0, w, h);
+    return canvas.toDataURL("image/jpeg", 0.88);
+  } catch (_e) {
+    return src;
+  }
+}
 
 function applyTheme() {
   const clean = (hex, fallback) => (String(hex || "").length === 7 ? hex : fallback).replace("#", "");
@@ -968,9 +1081,26 @@ function applyTheme() {
   document.documentElement.style.setProperty("--team-accent-rgb", `${parseInt(ca.slice(0, 2), 16)}, ${parseInt(ca.slice(2, 4), 16)}, ${parseInt(ca.slice(4, 6), 16)}`);
 }
 
-function anyModalOpen() { return !teamModal.classList.contains("is-hidden") || !goalModal.classList.contains("is-hidden") || !rosterModal.classList.contains("is-hidden") || !eventModal.classList.contains("is-hidden") || !eventDetailModal.classList.contains("is-hidden") || !slotAssignModal.classList.contains("is-hidden") || !appDialogModal.classList.contains("is-hidden") || !photoCropModal.classList.contains("is-hidden") || !flyerPreviewModal.classList.contains("is-hidden"); }
+function anyModalOpen() { return !teamModal.classList.contains("is-hidden") || !adminModal.classList.contains("is-hidden") || !goalModal.classList.contains("is-hidden") || !rosterModal.classList.contains("is-hidden") || !eventModal.classList.contains("is-hidden") || !eventDetailModal.classList.contains("is-hidden") || !slotAssignModal.classList.contains("is-hidden") || !appDialogModal.classList.contains("is-hidden") || !photoCropModal.classList.contains("is-hidden") || !flyerPreviewModal.classList.contains("is-hidden"); }
 function syncBodyLock() { document.body.classList.toggle("modal-open", anyModalOpen()); }
-function openTeam(open) { if (open) { teamNameEl.value = state.team.name; teamDivisionEl.value = state.team.division || ""; teamHometownEl.value = state.team.hometown || ""; coachNameEl.value = state.team.coach; assistantCoachNameEl.value = state.team.assistantCoach || ""; teamManagerNameEl.value = state.team.teamManager || ""; teamParentNameEl.value = state.team.teamParent || ""; teamColor1El.value = state.team.color1; teamColor2El.value = state.team.color2; teamAccentEl.value = state.team.accent; logoFileNameEl.textContent = "No file selected"; teamLogoEl.value = ""; } teamModal.classList.toggle("is-hidden", !open); syncBodyLock(); }
+function openTeam(open) {
+  if (open) {
+    teamNameEl.value = state.team.name;
+    teamDivisionEl.value = state.team.division || "";
+    teamHometownEl.value = state.team.hometown || "";
+    teamAdminDraft = getNormalizedAdmins(state.team).map((admin) => ({ ...admin, linkedPlayerIds: [...admin.linkedPlayerIds] }));
+    teamColor1El.value = state.team.color1;
+    teamColor2El.value = state.team.color2;
+    teamAccentEl.value = state.team.accent;
+    logoFileNameEl.textContent = "No file selected";
+    teamLogoEl.value = "";
+    renderAdminEditorList();
+  } else {
+    openAdmin(false);
+  }
+  teamModal.classList.toggle("is-hidden", !open);
+  syncBodyLock();
+}
 function openGoal(open) {
   if (open) {
     goalTitleInputEl.value = state.team.goalTitle || "";
@@ -980,6 +1110,22 @@ function openGoal(open) {
   syncBodyLock();
 }
 function openRoster(open) { rosterModal.classList.toggle("is-hidden", !open); syncBodyLock(); }
+function openAdmin(open) {
+  adminModal.classList.toggle("is-hidden", !open);
+  if (!open) {
+    editingAdminIndex = null;
+    pendingAdminPhotoDataUrl = "";
+    adminForm.reset();
+    adminRoleEl.value = "head_coach";
+    adminCustomLabelWrapEl.classList.add("is-hidden");
+    adminPhotoEl.value = "";
+    adminPhotoFileNameEl.textContent = "No file selected";
+    setAdminPhotoPreview("");
+    adminLinkedPlayersWrapEl.classList.add("is-hidden");
+    renderAdminLinkedPlayerOptions([]);
+  }
+  syncBodyLock();
+}
 function openEvent(open) { eventModal.classList.toggle("is-hidden", !open); syncBodyLock(); }
 function openEventDetail(open) {
   eventDetailModal.classList.toggle("is-hidden", !open);
@@ -1070,6 +1216,7 @@ function closeAppDialog(runCancel = false) {
 }
 function openCrop(open) { photoCropModal.classList.toggle("is-hidden", !open); syncBodyLock(); }
 function openPlayerDetail(open) { playerDetailModal.classList.toggle("is-hidden", !open); }
+function openAdminDetail(open) { adminDetailModal.classList.toggle("is-hidden", !open); }
 async function openFlyerPreview(open, src = "", title = "Flyer Preview", mime = "image/*", overlayLogoSrc = "") {
   if (open) {
     const requestToken = ++flyerPreviewRequestToken;
@@ -1104,23 +1251,155 @@ async function openFlyerPreview(open, src = "", title = "Flyer Preview", mime = 
   syncBodyLock();
 }
 
+function setAdminPhotoPreview(src) {
+  if (!src) {
+    if (adminPreviewObjectUrl) {
+      URL.revokeObjectURL(adminPreviewObjectUrl);
+      adminPreviewObjectUrl = "";
+    }
+    adminPhotoPreviewWrapEl.classList.add("is-hidden");
+    adminPhotoPreviewImgEl.removeAttribute("src");
+    return;
+  }
+  adminPhotoPreviewImgEl.src = src;
+  adminPhotoPreviewWrapEl.classList.remove("is-hidden");
+}
+function getAdminSummaryText(admin) {
+  const linkedNames = getLinkedPlayerNames(admin.linkedPlayerIds);
+  if (!linkedNames.length) return "No linked players";
+  if (linkedNames.length === 1) return `Linked to ${linkedNames[0]}`;
+  return `Linked to ${linkedNames.length} players`;
+}
+function renderAdminLinkedPlayerOptions(selectedIds = []) {
+  const selected = new Set(selectedIds.map((id) => String(id || "").trim()).filter(Boolean));
+  adminLinkedPlayersListEl.innerHTML = "";
+  if (!state.players.length) {
+    toggleAdminLinksBtn.textContent = "No players on roster";
+    toggleAdminLinksBtn.disabled = true;
+    adminLinkedPlayersSummaryEl.textContent = "Add players to the roster to link them here.";
+    adminLinkedPlayersWrapEl.classList.add("is-hidden");
+    return;
+  }
+  toggleAdminLinksBtn.disabled = false;
+  toggleAdminLinksBtn.textContent = adminLinkedPlayersWrapEl.classList.contains("is-hidden") ? "Link to Player(s)" : "Hide Linked Player(s)";
+  const linkedNames = getLinkedPlayerNames([...selected]);
+  adminLinkedPlayersSummaryEl.textContent = linkedNames.length ? linkedNames.join(", ") : "No linked players selected.";
+  state.players.forEach((player) => {
+    const row = document.createElement("label");
+    row.className = "admin-linked-player-option";
+    row.innerHTML = `<input type="checkbox" value="${escapeHtml(player.id)}" ${selected.has(player.id) ? "checked" : ""} /><span>${escapeHtml(player.name || "Unnamed Player")}${player.number ? ` <strong>#${escapeHtml(player.number)}</strong>` : ""}</span>`;
+    adminLinkedPlayersListEl.appendChild(row);
+  });
+}
+function resetAdminForm() {
+  editingAdminIndex = null;
+  adminModalTitleEl.textContent = "Add Admin";
+  saveAdminBtn.textContent = "Save Admin";
+  adminForm.reset();
+  adminRoleEl.value = "head_coach";
+  adminCustomLabelWrapEl.classList.add("is-hidden");
+  adminCustomLabelEl.value = "";
+  adminPhoneEl.value = "";
+  adminEmailEl.value = "";
+  pendingAdminPhotoDataUrl = "";
+  adminPhotoEl.value = "";
+  adminPhotoFileNameEl.textContent = "No file selected";
+  adminLinkedPlayersWrapEl.classList.add("is-hidden");
+  renderAdminLinkedPlayerOptions([]);
+  setAdminPhotoPreview("");
+}
+function fillAdminForm(index) {
+  const admin = teamAdminDraft[index];
+  if (!admin) return;
+  editingAdminIndex = index;
+  adminModalTitleEl.textContent = "Edit Admin";
+  saveAdminBtn.textContent = "Save Changes";
+  adminRoleEl.value = admin.role || "head_coach";
+  adminCustomLabelWrapEl.classList.toggle("is-hidden", admin.role !== "custom");
+  adminCustomLabelEl.value = admin.customLabel || "";
+  adminNameEl.value = admin.name || "";
+  adminPhoneEl.value = admin.phone || "";
+  adminEmailEl.value = admin.email || "";
+  pendingAdminPhotoDataUrl = "";
+  adminPhotoEl.value = "";
+  adminPhotoFileNameEl.textContent = admin.photoDataUrl ? "Current photo on file" : "No file selected";
+  adminLinkedPlayersWrapEl.classList.add("is-hidden");
+  renderAdminLinkedPlayerOptions(admin.linkedPlayerIds || []);
+  setAdminPhotoPreview(admin.photoDataUrl || "");
+}
+function renderAdminEditorList() {
+  adminEditorListEl.innerHTML = "";
+  const admins = teamAdminDraft.filter((admin) => admin?.name);
+  adminCountTextEl.textContent = admins.length ? `${admins.length} admin${admins.length === 1 ? "" : "s"} added` : "No admins added yet";
+  admins.forEach((admin, index) => {
+    const item = document.createElement("li");
+    item.className = "admin-editor-item";
+    item.innerHTML = `
+      <div class="admin-editor-main">
+        <strong>${escapeHtml(admin.name)}</strong>
+        <span>${escapeHtml(getAdminRoleLabel(admin.role, admin.customLabel))}</span>
+        <span>${escapeHtml(getAdminSummaryText(admin))}</span>
+      </div>
+      <div class="admin-editor-actions">
+        <button type="button" data-admin-edit="${index}">Edit</button>
+        <button type="button" data-admin-delete="${index}" class="danger-btn">Remove</button>
+      </div>
+    `;
+    adminEditorListEl.appendChild(item);
+  });
+}
+
 function renderTeam() {
-  $("coachNameValue").textContent = state.team.coach || "Not set";
-  const assistantCoach = String(state.team.assistantCoach || "").trim();
-  const teamManager = String(state.team.teamManager || "").trim();
-  const teamParent = String(state.team.teamParent || "").trim();
+  const admins = getNormalizedAdmins(state.team);
   const teamName = String(state.team.name || "").trim();
   const teamDivision = String(state.team.division || "").trim();
   const teamHometown = String(state.team.hometown || "").trim();
   const subtitleParts = [teamDivision, teamHometown].filter(Boolean);
   if (appHeaderTitleEl) appHeaderTitleEl.textContent = teamName || "TeamFund";
-  if (appHeaderSubtitleEl) appHeaderSubtitleEl.textContent = subtitleParts.length ? subtitleParts.join(" • ") : "Team-first fundraising dashboard";
-  $("assistantCoachValue").textContent = assistantCoach || "Not set";
-  $("teamManagerValue").textContent = teamManager || "Not set";
-  $("teamParentValue").textContent = teamParent || "Not set";
-  $("assistantCoachRow").classList.toggle("is-hidden", !assistantCoach);
-  $("teamManagerRow").classList.toggle("is-hidden", !teamManager);
-  $("teamParentRow").classList.toggle("is-hidden", !teamParent);
+  if (appHeaderSubtitleEl) appHeaderSubtitleEl.textContent = subtitleParts.length ? subtitleParts.join(" | ") : "Team-first fundraising dashboard";
+  teamAdminsListEl.innerHTML = "";
+  teamAdminsEmptyEl.classList.toggle("is-hidden", admins.length > 0);
+  admins.forEach((admin) => {
+    const linkedNames = getLinkedPlayerNames(admin.linkedPlayerIds);
+    const initials = getInitials(admin.name, "A");
+    const avatar = admin.photoDataUrl ? `<img src="${admin.photoDataUrl}" alt="${escapeHtml(admin.name)} photo" />` : `<span>${initials}</span>`;
+    const li = document.createElement("li");
+    li.className = "player-pill";
+    li.innerHTML = `<button type="button" class="player-pill-head admin-pill-head"><span class="player-avatar">${avatar}</span><span class="admin-pill-copy"><strong>${escapeHtml(admin.name || "")}</strong><span>${escapeHtml(getAdminRoleLabel(admin.role, admin.customLabel))}</span></span></button>`;
+    li.querySelector(".player-pill-head").addEventListener("click", (e) => {
+      selectedAdminAnchor = e.currentTarget;
+      const linkedPlayers = state.players.filter((player) => admin.linkedPlayerIds.includes(player.id));
+      detailAdminPhoto.innerHTML = admin.photoDataUrl ? `<img src="${admin.photoDataUrl}" alt="${escapeHtml(admin.name)} large photo" />` : `<span>${initials}</span>`;
+      detailAdminName.textContent = admin.name || "-";
+      detailAdminTitle.textContent = getAdminRoleLabel(admin.role, admin.customLabel);
+      detailAdminPhone.textContent = formatPhone(admin.phone || "") || "-";
+      detailAdminEmail.textContent = admin.email || "-";
+      detailAdminLinkedPlayers.innerHTML = "";
+      if (!linkedPlayers.length) {
+        detailAdminLinkedPlayers.textContent = "No linked players";
+      } else {
+        linkedPlayers.forEach((player) => {
+          const playerIndex = state.players.findIndex((entry) => entry.id === player.id);
+          if (playerIndex === -1) return;
+          const playerInitials = getInitials(player.name, "P");
+          const playerAvatar = player.photoDataUrl ? `<img src="${player.photoDataUrl}" alt="${escapeHtml(player.name)} photo" />` : `<span>${playerInitials}</span>`;
+          const playerPill = document.createElement("li");
+          playerPill.className = "player-pill";
+          playerPill.innerHTML = `<button type="button" class="player-pill-head"><span class="player-avatar">${playerAvatar}</span><strong>${escapeHtml(player.name || "")}${player.number ? ` #${escapeHtml(player.number)}` : ""}</strong></button>`;
+          playerPill.querySelector(".player-pill-head").addEventListener("click", (event) => {
+            event.stopPropagation();
+            openAdminDetail(false);
+            selectedAdminAnchor = null;
+            openPlayerDetailForIndex(playerIndex, event.currentTarget);
+          });
+          detailAdminLinkedPlayers.appendChild(playerPill);
+        });
+      }
+      openAdminDetail(true);
+      positionAdminDetail();
+    });
+    teamAdminsListEl.appendChild(li);
+  });
   renderTeamPayments();
   const headerLogoLayer = $("headerLogoLayer");
   const headerLogo = $("headerLogo");
@@ -1178,6 +1457,20 @@ function fillPlayerForm(index) {
   pendingPlayerPhotoDataUrl = "";
   setRosterPreview(p.photoDataUrl || "");
 }
+function openPlayerDetailForIndex(index, anchorEl) {
+  const p = state.players[index];
+  if (!p) return;
+  const initials = getInitials(p.name, "P");
+  selectedPlayerIndex = index;
+  selectedPlayerAnchor = anchorEl || null;
+  detailPlayerPhoto.innerHTML = p.photoDataUrl ? `<img src="${p.photoDataUrl}" alt="${escapeHtml(p.name)} large photo" />` : `<span>${initials}</span>`;
+  detailPlayerName.textContent = p.name || "-";
+  detailPlayerNumber.textContent = p.number ? `#${p.number}` : "-";
+  detailContactName.textContent = p.contactName || "-";
+  detailContactPhone.textContent = formatPhone(p.contactPhone || "");
+  openPlayerDetail(true);
+  if (anchorEl) positionPlayerDetail();
+}
 function renderRoster() {
   rosterList.innerHTML = "";
   state.players.forEach((p, idx) => {
@@ -1187,15 +1480,7 @@ function renderRoster() {
     li.className = "player-pill";
     li.innerHTML = `<button type="button" class="player-pill-head"><span class="player-avatar">${avatar}</span><strong>${escapeHtml(p.name || "")}${p.number ? ` #${escapeHtml(p.number)}` : ""}</strong></button>`;
     li.querySelector(".player-pill-head").addEventListener("click", (e) => {
-      selectedPlayerIndex = idx;
-      selectedPlayerAnchor = e.currentTarget;
-      detailPlayerPhoto.innerHTML = p.photoDataUrl ? `<img src="${p.photoDataUrl}" alt="${escapeHtml(p.name)} large photo" />` : `<span>${initials}</span>`;
-      detailPlayerName.textContent = p.name || "-";
-      detailPlayerNumber.textContent = p.number ? `#${p.number}` : "-";
-      detailContactName.textContent = p.contactName || "-";
-      detailContactPhone.textContent = formatPhone(p.contactPhone || "");
-      openPlayerDetail(true);
-      positionPlayerDetail();
+      openPlayerDetailForIndex(idx, e.currentTarget);
     });
     rosterList.appendChild(li);
   });
@@ -1215,6 +1500,20 @@ function positionPlayerDetail() {
   if (top < m) top = m;
   playerDetailModal.style.left = `${left}px`;
   playerDetailModal.style.top = `${top}px`;
+}
+function positionAdminDetail() {
+  if (adminDetailModal.classList.contains("is-hidden") || !selectedAdminAnchor) return;
+  const a = selectedAdminAnchor.getBoundingClientRect();
+  const p = adminDetailModal.getBoundingClientRect();
+  const m = 12;
+  let left = a.right + 10;
+  let top = a.top;
+  if (left + p.width > window.innerWidth - m) left = a.left - p.width - 10;
+  if (left < m) left = m;
+  if (top + p.height > window.innerHeight - m) top = window.innerHeight - p.height - m;
+  if (top < m) top = m;
+  adminDetailModal.style.left = `${left}px`;
+  adminDetailModal.style.top = `${top}px`;
 }
 
 function updateEventListScrollState() {
@@ -2137,15 +2436,95 @@ function wireInputs() {
     state.team.name = teamNameEl.value.trim();
     state.team.division = teamDivisionEl.value.trim();
     state.team.hometown = teamHometownEl.value.trim();
-    state.team.coach = coachNameEl.value.trim();
-    state.team.assistantCoach = assistantCoachNameEl.value.trim();
-    state.team.teamManager = teamManagerNameEl.value.trim();
-    state.team.teamParent = teamParentNameEl.value.trim();
+    state.team.admins = teamAdminDraft.map((admin) => normalizeAdminRecord(admin)).filter((admin) => admin.name);
+    state.team.coach = "";
+    state.team.assistantCoach = "";
+    state.team.teamManager = "";
+    state.team.teamParent = "";
     state.team.color1 = teamColor1El.value;
     state.team.color2 = teamColor2El.value;
     state.team.accent = teamAccentEl.value;
     if (teamLogoEl.files?.[0]) state.team.logoDataUrl = await readFileAsDataUrl(teamLogoEl.files[0]);
     applyTheme(); renderTeam(); openTeam(false); saveState();
+  });
+  openAdminBtn.addEventListener("click", () => {
+    resetAdminForm();
+    openAdmin(true);
+  });
+  cancelAdminBtn.addEventListener("click", () => {
+    resetAdminForm();
+    openAdmin(false);
+  });
+  adminRoleEl.addEventListener("change", () => {
+    const isCustom = adminRoleEl.value === "custom";
+    adminCustomLabelWrapEl.classList.toggle("is-hidden", !isCustom);
+    if (!isCustom) adminCustomLabelEl.value = "";
+  });
+  adminForm.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const role = normalizeAdminRole(adminRoleEl.value);
+    const name = adminNameEl.value.trim();
+    const rawPhone = adminPhoneEl.value.trim();
+    const phone = rawPhone ? formatPhone(rawPhone) : "";
+    if (!name) return;
+    let photoDataUrl = pendingAdminPhotoDataUrl || "";
+    if (!photoDataUrl && adminPhotoEl.files?.[0]) photoDataUrl = await readPlayerPhotoData(adminPhotoEl.files[0]);
+    const linkedPlayerIds = Array.from(adminLinkedPlayersListEl.querySelectorAll('input[type="checkbox"]:checked')).map((input) => input.value);
+    const payload = normalizeAdminRecord({
+      id: editingAdminIndex === null ? "" : teamAdminDraft[editingAdminIndex]?.id,
+      role,
+      customLabel: role === "custom" ? adminCustomLabelEl.value.trim() : "",
+      name,
+      phone,
+      email: adminEmailEl.value.trim(),
+      photoDataUrl: photoDataUrl || teamAdminDraft[editingAdminIndex]?.photoDataUrl || "",
+      linkedPlayerIds,
+    });
+    if (editingAdminIndex === null) teamAdminDraft.push(payload);
+    else teamAdminDraft[editingAdminIndex] = payload;
+    renderAdminEditorList();
+    resetAdminForm();
+    openAdmin(false);
+  });
+  adminPhotoEl.addEventListener("change", () => {
+    const file = adminPhotoEl.files?.[0];
+    adminPhotoFileNameEl.textContent = file ? file.name : "No file selected";
+    if (!file) {
+      pendingAdminPhotoDataUrl = "";
+      const existingPhoto = editingAdminIndex !== null ? teamAdminDraft[editingAdminIndex]?.photoDataUrl : "";
+      setAdminPhotoPreview(existingPhoto || "");
+      return;
+    }
+    pendingAdminPhotoDataUrl = "";
+    if (adminPreviewObjectUrl) URL.revokeObjectURL(adminPreviewObjectUrl);
+    adminPreviewObjectUrl = URL.createObjectURL(file);
+    setAdminPhotoPreview(adminPreviewObjectUrl);
+  });
+  toggleAdminLinksBtn.addEventListener("click", () => {
+    if (!state.players.length) return;
+    const opening = adminLinkedPlayersWrapEl.classList.contains("is-hidden");
+    adminLinkedPlayersWrapEl.classList.toggle("is-hidden", !opening);
+    const selectedIds = Array.from(adminLinkedPlayersListEl.querySelectorAll('input[type="checkbox"]:checked')).map((input) => input.value);
+    renderAdminLinkedPlayerOptions(selectedIds);
+  });
+  adminLinkedPlayersListEl.addEventListener("change", () => {
+    const selectedIds = Array.from(adminLinkedPlayersListEl.querySelectorAll('input[type="checkbox"]:checked')).map((input) => input.value);
+    renderAdminLinkedPlayerOptions(selectedIds);
+  });
+  adminEditorListEl.addEventListener("click", (e) => {
+    const target = e.target;
+    if (!(target instanceof HTMLElement)) return;
+    const editBtn = target.closest("[data-admin-edit]");
+    if (editBtn) {
+      fillAdminForm(Number(editBtn.getAttribute("data-admin-edit")));
+      openAdmin(true);
+      return;
+    }
+    const deleteBtn = target.closest("[data-admin-delete]");
+    if (!deleteBtn) return;
+    const index = Number(deleteBtn.getAttribute("data-admin-delete"));
+    teamAdminDraft.splice(index, 1);
+    renderAdminEditorList();
   });
   teamLogoEl.addEventListener("change", () => { logoFileNameEl.textContent = teamLogoEl.files?.[0]?.name || "No file selected"; });
   teamVenmoQrBtn.addEventListener("click", () => handleTeamPaymentCardClick("venmoQr", "Venmo QR", teamVenmoQrFileEl));
@@ -2195,7 +2574,7 @@ function wireInputs() {
     if (!name || !contactName || !contactPhone) return;
     let photoDataUrl = pendingPlayerPhotoDataUrl || "";
     if (!photoDataUrl && playerPhotoEl.files?.[0]) photoDataUrl = await readPlayerPhotoData(playerPhotoEl.files[0]);
-    const payload = { name, number, contactName, contactPhone: formatPhone(contactPhone), photoDataUrl };
+    const payload = { id: editingPlayerIndex === null ? crypto.randomUUID() : state.players[editingPlayerIndex]?.id || crypto.randomUUID(), name, number, contactName, contactPhone: formatPhone(contactPhone), photoDataUrl };
     if (editingPlayerIndex === null) state.players.push(payload);
     else state.players[editingPlayerIndex] = { ...state.players[editingPlayerIndex], ...payload, photoDataUrl: payload.photoDataUrl || state.players[editingPlayerIndex].photoDataUrl || "" };
     editingPlayerIndex = null;
@@ -2206,6 +2585,7 @@ function wireInputs() {
     playerPhotoFileNameEl.textContent = "No file selected";
     setRosterPreview("");
     renderRoster();
+    renderTeam();
     openRoster(false);
     saveState();
   });
@@ -2220,6 +2600,9 @@ function wireInputs() {
   });
   contactPhoneEl.addEventListener("blur", () => {
     contactPhoneEl.value = formatPhone(contactPhoneEl.value);
+  });
+  adminPhoneEl.addEventListener("blur", () => {
+    adminPhoneEl.value = formatPhone(adminPhoneEl.value);
   });
   eventLeadPhoneEl.addEventListener("blur", () => {
     eventLeadPhoneEl.value = formatPhone(eventLeadPhoneEl.value);
@@ -2687,6 +3070,7 @@ function wireInputs() {
 
   window.addEventListener("resize", () => {
     if (!playerDetailModal.classList.contains("is-hidden")) positionPlayerDetail();
+    if (!adminDetailModal.classList.contains("is-hidden")) positionAdminDetail();
     positionCalendarPopover();
     updateRosterListScrollState();
     updateEventListScrollState();
@@ -2698,11 +3082,17 @@ function wireInputs() {
       const insideEventDetails = path.includes(eventTypeDetailsEl);
       if (!insideCalendar && !insideEventDetails) closeCalendarPopover();
     }
-    if (playerDetailModal.classList.contains("is-hidden")) return;
     const t = e.target;
-    const inside = playerDetailModal.contains(t);
-    const onAnchor = selectedPlayerAnchor && (selectedPlayerAnchor === t || selectedPlayerAnchor.contains(t));
-    if (!inside && !onAnchor) { openPlayerDetail(false); selectedPlayerIndex = null; selectedPlayerAnchor = null; }
+    if (!playerDetailModal.classList.contains("is-hidden")) {
+      const inside = playerDetailModal.contains(t);
+      const onAnchor = selectedPlayerAnchor && (selectedPlayerAnchor === t || selectedPlayerAnchor.contains(t));
+      if (!inside && !onAnchor) { openPlayerDetail(false); selectedPlayerIndex = null; selectedPlayerAnchor = null; }
+    }
+    if (!adminDetailModal.classList.contains("is-hidden")) {
+      const insideAdmin = adminDetailModal.contains(t);
+      const onAdminAnchor = selectedAdminAnchor && (selectedAdminAnchor === t || selectedAdminAnchor.contains(t));
+      if (!insideAdmin && !onAdminAnchor) { openAdminDetail(false); selectedAdminAnchor = null; }
+    }
   });
 }
 
@@ -2712,6 +3102,7 @@ async function initApp() {
   applyTheme();
   renderTeam();
   openTeam(false);
+  openAdmin(false);
   openGoal(false);
   openRoster(false);
   openEvent(false);
@@ -2719,6 +3110,7 @@ async function initApp() {
   openSlotAssign(false);
   openCrop(false);
   openPlayerDetail(false);
+  openAdminDetail(false);
   renderRoster();
   renderEvents();
   renderGoal();
@@ -2729,6 +3121,7 @@ initApp().catch(() => {
   applyTheme();
   renderTeam();
   openTeam(false);
+  openAdmin(false);
   openGoal(false);
   openRoster(false);
   openEvent(false);
@@ -2736,6 +3129,7 @@ initApp().catch(() => {
   openSlotAssign(false);
   openCrop(false);
   openPlayerDetail(false);
+  openAdminDetail(false);
   renderRoster();
   renderEvents();
   renderGoal();
