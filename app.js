@@ -85,6 +85,8 @@ const teamColor2El = $("teamColor2");
 const teamAccentEl = $("teamAccentColor");
 const teamLogoEl = $("teamLogo");
 const logoFileNameEl = $("logoFileName");
+const teamLogoPreviewWrapEl = $("teamLogoPreviewWrap");
+const teamLogoPreviewImgEl = $("teamLogoPreviewImg");
 const teamVenmoQrBtn = $("teamVenmoQrBtn");
 const teamVenmoQrPreviewEl = $("teamVenmoQrPreview");
 const teamVenmoQrFileEl = $("teamVenmoQrFile");
@@ -235,6 +237,7 @@ let rosterPreviewObjectUrl = "";
 let editingAdminIndex = null;
 let pendingAdminPhotoDataUrl = "";
 let adminPreviewObjectUrl = "";
+let teamLogoPreviewObjectUrl = "";
 let teamAdminDraft = [];
 let calendarAnchorEl = null;
 const calendarView = { year: 0, month: 0 };
@@ -384,6 +387,23 @@ function getLinkedPlayerNames(linkedPlayerIds = []) {
   const selectedIds = new Set(linkedPlayerIds.map((id) => String(id || "").trim()).filter(Boolean));
   return state.players.filter((player) => selectedIds.has(player.id)).map((player) => player.name || `Player ${player.number || ""}`.trim()).filter(Boolean);
 }
+function setTeamLogoPreview(src) {
+  if (!src) {
+    if (teamLogoPreviewObjectUrl) {
+      URL.revokeObjectURL(teamLogoPreviewObjectUrl);
+      teamLogoPreviewObjectUrl = "";
+    }
+    teamLogoPreviewWrapEl.classList.add("is-hidden");
+    teamLogoPreviewImgEl.removeAttribute("src");
+    return;
+  }
+  if (teamLogoPreviewObjectUrl && src !== teamLogoPreviewObjectUrl) {
+    URL.revokeObjectURL(teamLogoPreviewObjectUrl);
+    teamLogoPreviewObjectUrl = "";
+  }
+  teamLogoPreviewImgEl.src = src;
+  teamLogoPreviewWrapEl.classList.remove("is-hidden");
+}
 function parseIsoDate(iso) {
   const m = String(iso || "").match(/^(\d{4})-(\d{2})-(\d{2})$/);
   if (!m) return null;
@@ -468,6 +488,7 @@ function resetAllData() {
   teamAccentEl.value = state.team.accent;
   logoFileNameEl.textContent = "No file selected";
   teamLogoEl.value = "";
+  setTeamLogoPreview(state.team.logoDataUrl || "");
   adminForm.reset();
   adminPhotoEl.value = "";
   adminPhotoFileNameEl.textContent = "No file selected";
@@ -1094,9 +1115,11 @@ function openTeam(open) {
     teamAccentEl.value = state.team.accent;
     logoFileNameEl.textContent = "No file selected";
     teamLogoEl.value = "";
+    setTeamLogoPreview(state.team.logoDataUrl || "");
     renderAdminEditorList();
   } else {
     openAdmin(false);
+    setTeamLogoPreview("");
   }
   teamModal.classList.toggle("is-hidden", !open);
   syncBodyLock();
@@ -2526,7 +2549,17 @@ function wireInputs() {
     teamAdminDraft.splice(index, 1);
     renderAdminEditorList();
   });
-  teamLogoEl.addEventListener("change", () => { logoFileNameEl.textContent = teamLogoEl.files?.[0]?.name || "No file selected"; });
+  teamLogoEl.addEventListener("change", () => {
+    const file = teamLogoEl.files?.[0];
+    logoFileNameEl.textContent = file?.name || "No file selected";
+    if (!file) {
+      setTeamLogoPreview(state.team.logoDataUrl || "");
+      return;
+    }
+    if (teamLogoPreviewObjectUrl) URL.revokeObjectURL(teamLogoPreviewObjectUrl);
+    teamLogoPreviewObjectUrl = URL.createObjectURL(file);
+    setTeamLogoPreview(teamLogoPreviewObjectUrl);
+  });
   teamVenmoQrBtn.addEventListener("click", () => handleTeamPaymentCardClick("venmoQr", "Venmo QR", teamVenmoQrFileEl));
   teamZelleQrBtn.addEventListener("click", () => handleTeamPaymentCardClick("zelleQr", "Zelle QR Code", teamZelleQrFileEl));
   editTeamVenmoQrBtn.addEventListener("click", () => promptTeamPaymentChoice("venmoQr", "Venmo QR", teamVenmoQrFileEl));
