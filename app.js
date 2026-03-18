@@ -84,6 +84,7 @@ const teamColor1El = $("teamColor1");
 const teamColor2El = $("teamColor2");
 const teamAccentEl = $("teamAccentColor");
 const teamLogoEl = $("teamLogo");
+const cropTeamLogoBtn = $("cropTeamLogoBtn");
 const logoFileNameEl = $("logoFileName");
 const teamLogoPreviewWrapEl = $("teamLogoPreviewWrap");
 const teamLogoPreviewImgEl = $("teamLogoPreviewImg");
@@ -233,11 +234,13 @@ let selectedPlayerIndex = null;
 let selectedPlayerAnchor = null;
 let selectedAdminAnchor = null;
 let pendingPlayerPhotoDataUrl = "";
+let pendingTeamLogoDataUrl = "";
 let rosterPreviewObjectUrl = "";
 let editingAdminIndex = null;
 let pendingAdminPhotoDataUrl = "";
 let adminPreviewObjectUrl = "";
 let teamLogoPreviewObjectUrl = "";
+let cropTarget = "";
 let teamAdminDraft = [];
 let calendarAnchorEl = null;
 const calendarView = { year: 0, month: 0 };
@@ -337,6 +340,33 @@ function formatPhone(v) {
   const normalized = d.length === 11 && d.startsWith("1") ? d.slice(1) : d;
   if (normalized.length === 10) return `(${normalized.slice(0, 3)}) ${normalized.slice(3, 6)}-${normalized.slice(6)}`;
   return String(v || "").trim();
+}
+function normalizePhoneDigits(v) {
+  const digits = String(v || "").replace(/\D/g, "");
+  const normalized = digits.length === 11 && digits.startsWith("1") ? digits.slice(1) : digits;
+  return normalized.slice(0, 10);
+}
+function formatPhoneTypingValue(v) {
+  const digits = normalizePhoneDigits(v);
+  if (!digits) return "";
+  if (digits.length <= 3) return `(${digits}`;
+  if (digits.length <= 6) return `(${digits.slice(0, 3)}) ${digits.slice(3)}`;
+  return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
+}
+function hasValidPhone(v) {
+  return normalizePhoneDigits(v).length === 10;
+}
+function applyLivePhoneFormatting(input) {
+  if (!input) return;
+  input.inputMode = "numeric";
+  input.maxLength = 14;
+  input.value = formatPhoneTypingValue(input.value);
+  input.addEventListener("input", () => {
+    input.value = formatPhoneTypingValue(input.value);
+  });
+  input.addEventListener("blur", () => {
+    input.value = formatPhoneTypingValue(input.value);
+  });
 }
 function getInitials(name, fallback = "P") {
   const initials = String(name || "").split(" ").filter(Boolean).slice(0, 2).map((x) => x[0].toUpperCase()).join("");
@@ -594,6 +624,7 @@ function formatCountdownFromMs(ms) {
 function getSuggestedEventTitlePlaceholder(type) {
   const normalized = normalizeType(type);
   if (normalized === "canning") return "Weekend Canning Drive";
+  if (normalized === "car_wash") return "Saturday Car Wash";
   if (normalized === "raffle") return "Team Prize Raffle";
   if (normalized === "restaurant_night") return "Dine to Donate Night";
   if (normalized === "merch") return "Team Spirit Wear Sale";
@@ -857,8 +888,94 @@ function getCanningSlotTotalsSum(details) {
     return sum + n;
   }, 0);
 }
+function isScheduledShiftEvent(type) {
+  const normalized = normalizeType(type);
+  return normalized === "canning" || normalized === "car_wash";
+}
+function getScheduledEventConfig(type) {
+  if (normalizeType(type) === "car_wash") {
+    return {
+      locationLabel: "Car Wash Location",
+      locationPlaceholder: "Parking lot / address",
+      notesLabel: "Schedule Notes",
+      notesPlaceholder: "Shift notes, setup details, weather backup plan",
+      validationTitle: "Car Wash Validation",
+      slotTotalLabel: "Raised",
+      emptyScheduleText: "No schedule times available.",
+    };
+  }
+  return {
+    locationLabel: "Canning Location",
+    locationPlaceholder: "Storefront/intersection",
+    notesLabel: "Schedule Notes",
+    notesPlaceholder: "Shift notes, meeting point, setup details",
+    validationTitle: "Canning Validation",
+    slotTotalLabel: "Raised",
+    emptyScheduleText: "No schedule times available.",
+  };
+}
+function normalizeSupplyItems(items = []) {
+  return Array.isArray(items) ? items.map((item) => ({
+    id: item?.id || crypto.randomUUID(),
+    name: String(item?.name || "").trim(),
+    neededQty: String(item?.neededQty || "").trim(),
+    assignedTo: String(item?.assignedTo || "").trim(),
+    status: item?.status === "ready" ? "ready" : "needed",
+  })).filter((item) => item.name || item.neededQty || item.assignedTo || item.status === "ready") : [];
+}
+function getSupplyRowHtml(item = {}, playerOptions = [], rowState = "saved") {
+  const safe = {
+    id: item?.id || crypto.randomUUID(),
+    name: String(item?.name || "").trim(),
+    neededQty: String(item?.neededQty || "").trim(),
+    assignedTo: String(item?.assignedTo || "").trim(),
+    status: item?.status === "ready" ? "ready" : "needed",
+  };
+  const options = [`<option value="">Unassigned</option>`, ...playerOptions.map((name) => `<option value="${escapeHtml(name)}"${safe.assignedTo === name ? " selected" : ""}>${escapeHtml(name)}</option>`)].join("");
+  const draft = rowState === "draft";
+  const statusLabel = safe.status === "ready" ? "Ready" : "Needed";
+  return `<div class="scheduled-supply-row${draft ? " is-draft" : ""}" data-supply-row="1" data-row-state="${escapeHtml(rowState)}" data-supply-id="${escapeHtml(safe.id)}"><div class="scheduled-supply-head"><div class="scheduled-supply-head-copy"><span class="scheduled-supply-kicker">${draft ? "New Supply" : "Supply Item"}</span><strong>${escapeHtml(safe.name || "Add a checklist item")}</strong></div><span class="scheduled-supply-pill ${safe.status === "ready" ? "is-ready" : "is-needed"}">${escapeHtml(statusLabel)}</span></div><div class="scheduled-supply-grid"><div class="stack-sm scheduled-supply-field"><label class="field-label">Item</label><input class="scheduled-supply-name" type="text" placeholder="Soap buckets" value="${escapeHtml(safe.name)}" /></div><div class="stack-sm scheduled-supply-field"><label class="field-label">Qty Needed</label><input class="scheduled-supply-qty" type="text" placeholder="4" value="${escapeHtml(safe.neededQty)}" /></div><div class="stack-sm scheduled-supply-field"><label class="field-label">Assigned To</label><select class="scheduled-supply-assignee">${options}</select></div><div class="stack-sm scheduled-supply-field"><label class="field-label">Status</label><select class="scheduled-supply-status"><option value="needed"${safe.status === "needed" ? " selected" : ""}>Needed</option><option value="ready"${safe.status === "ready" ? " selected" : ""}>Ready</option></select></div></div><div class="scheduled-supply-footer"><button type="button" class="scheduled-supply-action-btn" data-row-action="${draft ? "add" : "remove"}">${draft ? "Add Supply" : "Remove Item"}</button></div></div>`;
+}
+function addSupplyRow(item = {}, rowState = "saved") {
+  const list = $("eventSupplyList");
+  if (!list) return null;
+  const playerOptions = state.players.map((player) => String(player?.name || "").trim()).filter(Boolean).sort((a, b) => a.localeCompare(b));
+  const wrap = document.createElement("div");
+  wrap.innerHTML = getSupplyRowHtml(item, playerOptions, rowState);
+  const row = wrap.firstElementChild;
+  if (!row) return null;
+  list.appendChild(row);
+  return row;
+}
+function ensureDraftSupplyRow() {
+  const list = $("eventSupplyList");
+  if (!list) return;
+  let draftRow = list.querySelector('[data-supply-row="1"][data-row-state="draft"]');
+  if (!draftRow) draftRow = addSupplyRow({}, "draft");
+  if (draftRow && list.firstElementChild !== draftRow) list.prepend(draftRow);
+}
+function renderSupplyRows(items = []) {
+  const list = $("eventSupplyList");
+  if (!list) return;
+  list.innerHTML = "";
+  normalizeSupplyItems(items).forEach((item) => addSupplyRow(item, "saved"));
+  ensureDraftSupplyRow();
+}
+function getSupplyChecklistHtml(items = []) {
+  const safe = normalizeSupplyItems(items);
+  if (!safe.length) return "";
+  return `<div class="scheduled-supply-checklist">${safe.map((item) => `<div class="scheduled-supply-checklist-row"><span class="scheduled-supply-checklist-status ${item.status === "ready" ? "is-ready" : "is-needed"}">${item.status === "ready" ? "Ready" : "Needed"}</span><strong>${escapeHtml(item.name || "Unnamed Item")}</strong><span>${escapeHtml(item.neededQty ? `Qty: ${item.neededQty}` : "Qty: -")}</span><span>${escapeHtml(item.assignedTo ? `Assigned: ${item.assignedTo}` : "Assigned: Unassigned")}</span></div>`).join("")}</div>`;
+}
+function isSupplyRowFilled(row) {
+  if (!row) return false;
+  const name = row.querySelector(".scheduled-supply-name")?.value.trim() || "";
+  const qty = row.querySelector(".scheduled-supply-qty")?.value.trim() || "";
+  const assigned = row.querySelector(".scheduled-supply-assignee")?.value.trim() || "";
+  const status = row.querySelector(".scheduled-supply-status")?.value || "needed";
+  return !!(name || qty || assigned || status === "ready");
+}
 function syncCanningRaisedForEvent(event) {
-  if (!event || normalizeType(event.type) !== "canning") return false;
+  if (!event || !isScheduledShiftEvent(event.type)) return false;
   const next = getCanningSlotTotalsSum(event.details || {});
   const prev = Number(event.raisedSoFar) || 0;
   event.raisedSoFar = next;
@@ -945,10 +1062,10 @@ function getIsoDateRange(startIso, endIso) {
 }
 function normalizeType(type) {
   const v = String(type || "").toLowerCase().trim();
-  return ({ canning: "canning", raffle: "raffle", merch: "merch", restaurant_night: "restaurant_night", other: "other", "restaurant night": "restaurant_night", "50/50": "raffle" }[v] || "other");
+  return ({ canning: "canning", car_wash: "car_wash", "car wash": "car_wash", raffle: "raffle", merch: "merch", restaurant_night: "restaurant_night", other: "other", "restaurant night": "restaurant_night", "50/50": "raffle" }[v] || "other");
 }
 function typeLabel(type) {
-  return ({ canning: "Canning", raffle: "Raffle", merch: "Merch", restaurant_night: "Restaurant Night", other: "Other" }[normalizeType(type)] || "Other");
+  return ({ canning: "Canning", car_wash: "Car Wash", raffle: "Raffle", merch: "Merch", restaurant_night: "Restaurant Night", other: "Other" }[normalizeType(type)] || "Other");
 }
 function readFileAsDataUrl(file) {
   return new Promise((resolve, reject) => {
@@ -1115,10 +1232,12 @@ function openTeam(open) {
     teamAccentEl.value = state.team.accent;
     logoFileNameEl.textContent = "No file selected";
     teamLogoEl.value = "";
+    pendingTeamLogoDataUrl = "";
     setTeamLogoPreview(state.team.logoDataUrl || "");
     renderAdminEditorList();
   } else {
     openAdmin(false);
+    pendingTeamLogoDataUrl = "";
     setTeamLogoPreview("");
   }
   teamModal.classList.toggle("is-hidden", !open);
@@ -1293,6 +1412,9 @@ function getAdminSummaryText(admin) {
   if (linkedNames.length === 1) return `Linked to ${linkedNames[0]}`;
   return `Linked to ${linkedNames.length} players`;
 }
+function getSelectedAdminLinkedPlayerIds() {
+  return Array.from(adminLinkedPlayersListEl.querySelectorAll(".slot-assign-player-btn.is-assigned")).map((button) => button.getAttribute("data-player-id") || "").filter(Boolean);
+}
 function renderAdminLinkedPlayerOptions(selectedIds = []) {
   const selected = new Set(selectedIds.map((id) => String(id || "").trim()).filter(Boolean));
   adminLinkedPlayersListEl.innerHTML = "";
@@ -1308,10 +1430,21 @@ function renderAdminLinkedPlayerOptions(selectedIds = []) {
   const linkedNames = getLinkedPlayerNames([...selected]);
   adminLinkedPlayersSummaryEl.textContent = linkedNames.length ? linkedNames.join(", ") : "No linked players selected.";
   state.players.forEach((player) => {
-    const row = document.createElement("label");
-    row.className = "admin-linked-player-option";
-    row.innerHTML = `<input type="checkbox" value="${escapeHtml(player.id)}" ${selected.has(player.id) ? "checked" : ""} /><span>${escapeHtml(player.name || "Unnamed Player")}${player.number ? ` <strong>#${escapeHtml(player.number)}</strong>` : ""}</span>`;
-    adminLinkedPlayersListEl.appendChild(row);
+    const name = String(player.name || "").trim() || "Unnamed Player";
+    const initials = getInitials(name, "P");
+    const avatar = player.photoDataUrl ? `<img src="${player.photoDataUrl}" alt="${escapeHtml(name)} photo" />` : `<span>${escapeHtml(initials)}</span>`;
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = `player-pill-head slot-assign-player-btn${selected.has(player.id) ? " is-assigned" : ""}`;
+    btn.setAttribute("data-player-id", player.id);
+    btn.innerHTML = `<span class="player-avatar">${avatar}</span><strong>${escapeHtml(name)}${player.number ? ` #${escapeHtml(player.number)}` : ""}</strong>`;
+    btn.addEventListener("click", () => {
+      const nextSelected = new Set(getSelectedAdminLinkedPlayerIds());
+      if (nextSelected.has(player.id)) nextSelected.delete(player.id);
+      else nextSelected.add(player.id);
+      renderAdminLinkedPlayerOptions([...nextSelected]);
+    });
+    adminLinkedPlayersListEl.appendChild(btn);
   });
 }
 function resetAdminForm() {
@@ -1767,7 +1900,8 @@ function renderRafflePrizeRows(prizes = []) {
 function renderEventTypeDetails(type, details = {}) {
   eventFormRenderedType = normalizeType(type);
   if (!type) { eventTypeDetailsEl.innerHTML = ""; return; }
-  if (type === "canning") {
+  if (isScheduledShiftEvent(type)) {
+    const config = getScheduledEventConfig(type);
     const startDate = details.startDate || "";
     const endDate = details.endDate || "";
     const startTime = details.startTime || "12:00";
@@ -1775,8 +1909,9 @@ function renderEventTypeDetails(type, details = {}) {
     const blockHoursRaw = Number(details.blockHours);
     const blockHours = Number.isFinite(blockHoursRaw) && blockHoursRaw > 0 ? blockHoursRaw : 1;
     const combined = startDate ? (endDate ? `${formatDateLabel(startDate)} - ${formatDateLabel(endDate)}` : formatDateLabel(startDate)) : "";
-    eventTypeDetailsEl.innerHTML = `<div class="stack-sm"><label class="field-label" for="canningLocation">Canning Location</label><input id="canningLocation" type="text" placeholder="Storefront/intersection" value="${escapeHtml(details.location || "")}" /></div><div class="stack-sm"><label class="field-label" for="canningDateRangeDisplay">Date(s)</label><div class="calendar-input-wrap single"><input id="canningDateRangeDisplay" type="text" readonly placeholder="Pick date(s)" value="${escapeHtml(combined)}" /><button type="button" class="calendar-trigger" data-calendar-flow="canning-range" aria-label="Open date calendar" title="Open calendar"><span aria-hidden="true">&#128197;</span></button><input id="canningStartDate" type="hidden" value="${escapeHtml(startDate)}" /><input id="canningEndDate" type="hidden" value="${escapeHtml(endDate)}" /></div></div><div id="canningBaseTimeWrap" class="split"><div class="stack-sm"><label class="field-label" for="canningStartTime">Start Time</label><input id="canningStartTime" type="time" value="${escapeHtml(startTime)}" /></div><div class="stack-sm"><label class="field-label" for="canningEndTime">End Time</label><input id="canningEndTime" type="time" value="${escapeHtml(endTime)}" /></div></div><div class="canning-block-hours-row"><input id="canningBlockHours" type="number" min="0.25" step="0.25" value="${escapeHtml(String(blockHours))}" aria-label="Hours per block" /><span class="canning-block-hours-text">hours per block</span></div><div id="canningPerDayWrap" class="stack-sm is-hidden"></div><div class="stack-sm"><label class="field-label" for="canningSchedule">Schedule Notes</label><textarea id="canningSchedule" rows="3" placeholder="Shift notes, meeting point, setup details">${escapeHtml(details.schedule || "")}</textarea></div>`;
+    eventTypeDetailsEl.innerHTML = `<div class="stack-sm"><label class="field-label" for="canningLocation">${escapeHtml(config.locationLabel)}</label><input id="canningLocation" type="text" placeholder="${escapeHtml(config.locationPlaceholder)}" value="${escapeHtml(details.location || "")}" /></div><div class="stack-sm"><label class="field-label" for="canningDateRangeDisplay">Date(s)</label><div class="calendar-input-wrap single"><input id="canningDateRangeDisplay" type="text" readonly placeholder="Pick date(s)" value="${escapeHtml(combined)}" /><button type="button" class="calendar-trigger" data-calendar-flow="canning-range" aria-label="Open date calendar" title="Open calendar"><span aria-hidden="true">&#128197;</span></button><input id="canningStartDate" type="hidden" value="${escapeHtml(startDate)}" /><input id="canningEndDate" type="hidden" value="${escapeHtml(endDate)}" /></div></div><div id="canningBaseTimeWrap" class="split"><div class="stack-sm"><label class="field-label" for="canningStartTime">Start Time</label><input id="canningStartTime" type="time" value="${escapeHtml(startTime)}" /></div><div class="stack-sm"><label class="field-label" for="canningEndTime">End Time</label><input id="canningEndTime" type="time" value="${escapeHtml(endTime)}" /></div></div><div class="canning-block-hours-row"><input id="canningBlockHours" type="number" min="0.25" step="0.25" value="${escapeHtml(String(blockHours))}" aria-label="Hours per block" /><span class="canning-block-hours-text">hours per block</span></div><div id="canningPerDayWrap" class="stack-sm is-hidden"></div><div class="stack-sm"><label class="field-label" for="canningSchedule">${escapeHtml(config.notesLabel)}</label><textarea id="canningSchedule" rows="3" placeholder="${escapeHtml(config.notesPlaceholder)}">${escapeHtml(details.schedule || "")}</textarea></div>${normalizeType(type) === "car_wash" ? '<div class="stack-sm"><label class="field-label">Supplies</label><div id="eventSupplyList" class="stack-sm"></div></div>' : ""}`;
     renderCanningPerDayTimes(details.dailyTimes || {});
+    if (normalizeType(type) === "car_wash") renderSupplyRows(details.supplies || []);
     return;
   }
   if (type === "raffle") {
@@ -1797,7 +1932,7 @@ function renderEventTypeDetails(type, details = {}) {
   eventTypeDetailsEl.innerHTML = `<div class="stack-sm"><label class="field-label" for="otherEventDetails">Event Details</label><textarea id="otherEventDetails" rows="3" placeholder="Custom details">${escapeHtml(details.notes || "")}</textarea></div>`;
 }
 function collectTypeDetails(type, existing = {}) {
-  if (type === "canning") {
+  if (isScheduledShiftEvent(type)) {
     const startDate = $("canningStartDate")?.value || "";
     const endDate = $("canningEndDate")?.value || "";
     const blockHoursRaw = Number($("canningBlockHours")?.value);
@@ -1811,7 +1946,28 @@ function collectTypeDetails(type, existing = {}) {
         endTime: row.querySelector(".canning-day-end")?.value || "",
       };
     });
-    return { location: $("canningLocation")?.value.trim() || "", startDate, endDate, startTime: $("canningStartTime")?.value || "", endTime: $("canningEndTime")?.value || "", blockHours, dailyTimes, schedule: $("canningSchedule")?.value.trim() || "" };
+    const supplies = normalizeType(type) === "car_wash"
+      ? Array.from(eventTypeDetailsEl.querySelectorAll('[data-supply-row="1"][data-row-state="saved"]')).map((row) => ({
+        id: row.getAttribute("data-supply-id") || crypto.randomUUID(),
+        name: row.querySelector(".scheduled-supply-name")?.value.trim() || "",
+        neededQty: row.querySelector(".scheduled-supply-qty")?.value.trim() || "",
+        assignedTo: row.querySelector(".scheduled-supply-assignee")?.value.trim() || "",
+        status: row.querySelector(".scheduled-supply-status")?.value === "ready" ? "ready" : "needed",
+      })).filter((item) => item.name || item.neededQty || item.assignedTo || item.status === "ready")
+      : [];
+    return {
+      location: $("canningLocation")?.value.trim() || "",
+      startDate,
+      endDate,
+      startTime: $("canningStartTime")?.value || "",
+      endTime: $("canningEndTime")?.value || "",
+      blockHours,
+      dailyTimes,
+      schedule: $("canningSchedule")?.value.trim() || "",
+      supplies,
+      assignments: existing?.assignments && typeof existing.assignments === "object" ? existing.assignments : {},
+      slotTotals: existing?.slotTotals && typeof existing.slotTotals === "object" ? existing.slotTotals : {},
+    };
   }
   if (type === "raffle") {
     const prizes = [];
@@ -1838,8 +1994,9 @@ function collectTypeDetails(type, existing = {}) {
   if (type === "merch") return { orderInfo: $("merchOrderInfo")?.value.trim() || "", orderLink: $("merchOrderLink")?.value.trim() || "", deadline: $("merchDeadline")?.value || "" };
   return { notes: $("otherEventDetails")?.value.trim() || "" };
 }
-function validateCanningDetails(details) {
-  if (!details.startDate) return "Select a start date for canning.";
+function validateScheduledEventDetails(details, type = "canning") {
+  const label = normalizeType(type) === "car_wash" ? "car wash" : "canning";
+  if (!details.startDate) return `Select a start date for ${label}.`;
   if (details.endDate && details.endDate < details.startDate) return "End date must be the same day or later than start date.";
   const blockHours = Number(details.blockHours);
   if (!Number.isFinite(blockHours) || blockHours <= 0) return "Hours per block must be greater than 0.";
@@ -1859,7 +2016,7 @@ function validateCanningDetails(details) {
 function eventSummary(e) {
   const d = e.details || {};
   const t = normalizeType(e.type);
-  if (t === "canning") {
+  if (isScheduledShiftEvent(t)) {
     const datePart = d.startDate ? (d.endDate ? `${formatDateLabel(d.startDate)} - ${formatDateLabel(d.endDate)}` : formatDateLabel(d.startDate)) : "Date TBD";
     const multiDay = d.startDate && d.endDate && d.endDate > d.startDate;
     const timePart = multiDay ? "Per-day times set" : (d.startTime && d.endTime ? `${formatTimeLabel(d.startTime)}-${formatTimeLabel(d.endTime)}` : "Time TBD");
@@ -1875,7 +2032,7 @@ function eventSummary(e) {
 function getEventMetaItems(e) {
   const d = e?.details || {};
   const t = normalizeType(e?.type);
-  if (t === "canning") {
+  if (isScheduledShiftEvent(t)) {
     const datePart = d.startDate ? (d.endDate ? `${formatDateLabel(d.startDate)} - ${formatDateLabel(d.endDate)}` : formatDateLabel(d.startDate)) : "Date TBD";
     const multiDay = d.startDate && d.endDate && d.endDate > d.startDate;
     const timePart = multiDay ? "Per-day times set" : (d.startTime && d.endTime ? `${formatTimeLabel(d.startTime)} - ${formatTimeLabel(d.endTime)}` : "Time TBD");
@@ -1907,7 +2064,7 @@ function eventMetaBoxHtml(e, className = "") {
 function eventSummaryHtml(e) {
   const d = e?.details || {};
   const t = normalizeType(e?.type);
-  if (t === "canning") {
+  if (isScheduledShiftEvent(t)) {
     return eventMetaBoxHtml(e);
   }
   if (t === "restaurant_night") {
@@ -2154,17 +2311,18 @@ function getCanningScheduleDays(details) {
   }).filter((day) => day.slots.length);
 }
 function renderCanningScheduleForEvent(e) {
-  if (normalizeType(e?.type) !== "canning") {
+  if (!isScheduledShiftEvent(e?.type)) {
     eventDetailScheduleWrap.classList.add("is-hidden");
     eventDetailScheduleGrid.innerHTML = "";
     return;
   }
   const days = getCanningScheduleDays(e.details || {});
   const playerByName = new Map(state.players.map((p) => [(p.name || "").trim(), p]));
+  const config = getScheduledEventConfig(e?.type);
   eventDetailScheduleWrap.classList.remove("is-hidden");
   eventDetailScheduleGrid.innerHTML = "";
   if (!days.length) {
-    eventDetailScheduleGrid.innerHTML = `<p class="canning-slot-empty">No schedule times available.</p>`;
+    eventDetailScheduleGrid.innerHTML = `<p class="canning-slot-empty">${escapeHtml(config.emptyScheduleText)}</p>`;
     return;
   }
   days.forEach((day) => {
@@ -2192,7 +2350,7 @@ function renderCanningScheduleForEvent(e) {
       footer.className = "canning-slot-footer";
       const total = document.createElement("span");
       total.className = "canning-slot-total";
-      total.textContent = `Raised: ${formatMoney(slot.raisedTotal)}`;
+      total.textContent = `${config.slotTotalLabel}: ${formatMoney(slot.raisedTotal)}`;
       const moneyBtn = document.createElement("button");
       moneyBtn.type = "button";
       moneyBtn.className = "canning-slot-money-btn";
@@ -2258,7 +2416,15 @@ function renderEventDetail() {
   if (raffle) startRaffleCountdown();
   else stopRaffleCountdown();
   const detailNotes = e.notes || e.details?.schedule || e.details?.details || e.details?.orderInfo || e.details?.notes || "No additional notes";
-  eventDetailNotesEl.innerHTML = raffle ? formatRafflePrizesHtml(e.details?.prizes) : linkifyAddressLines(detailNotes);
+  if (raffle) {
+    eventDetailNotesEl.innerHTML = formatRafflePrizesHtml(e.details?.prizes);
+  } else if (normalizeType(e.type) === "car_wash") {
+    const notesHtml = linkifyAddressLines(detailNotes);
+    const suppliesHtml = getSupplyChecklistHtml(e.details?.supplies);
+    eventDetailNotesEl.innerHTML = suppliesHtml ? `${notesHtml}<div class="detail-supplies-wrap"><p class="field-label">Supplies</p>${suppliesHtml}</div>` : notesHtml;
+  } else {
+    eventDetailNotesEl.innerHTML = linkifyAddressLines(detailNotes);
+  }
   eventDetailFlyersEl.innerHTML = "";
   (e.flyers || []).forEach((f, idx) => {
     const href = getFlyerHref(f);
@@ -2330,6 +2496,12 @@ function openCropForSource(src) {
     img.onerror = () => reject(new Error("img load fail"));
     img.src = src;
   });
+}
+function beginCropFlow(target, file = null, src = "") {
+  cropTarget = target;
+  if (file) return openCropForFile(file);
+  if (src) return openCropForSource(src);
+  return Promise.resolve();
 }
 function startCropDrag(clientX, clientY) {
   cropState.dragging = true;
@@ -2467,7 +2639,8 @@ function wireInputs() {
     state.team.color1 = teamColor1El.value;
     state.team.color2 = teamColor2El.value;
     state.team.accent = teamAccentEl.value;
-    if (teamLogoEl.files?.[0]) state.team.logoDataUrl = await readFileAsDataUrl(teamLogoEl.files[0]);
+    if (pendingTeamLogoDataUrl) state.team.logoDataUrl = pendingTeamLogoDataUrl;
+    else if (teamLogoEl.files?.[0]) state.team.logoDataUrl = await readFileAsDataUrl(teamLogoEl.files[0]);
     applyTheme(); renderTeam(); openTeam(false); saveState();
   });
   openAdminBtn.addEventListener("click", () => {
@@ -2490,9 +2663,13 @@ function wireInputs() {
     const rawPhone = adminPhoneEl.value.trim();
     const phone = rawPhone ? formatPhone(rawPhone) : "";
     if (!name) return;
+    if (rawPhone && !hasValidPhone(rawPhone)) {
+      openAppDialog({ title: "Admin Phone", message: "Enter a 10-digit phone number.", confirmLabel: "OK", showCancel: false });
+      return;
+    }
     let photoDataUrl = pendingAdminPhotoDataUrl || "";
     if (!photoDataUrl && adminPhotoEl.files?.[0]) photoDataUrl = await readPlayerPhotoData(adminPhotoEl.files[0]);
-    const linkedPlayerIds = Array.from(adminLinkedPlayersListEl.querySelectorAll('input[type="checkbox"]:checked')).map((input) => input.value);
+    const linkedPlayerIds = getSelectedAdminLinkedPlayerIds();
     const payload = normalizeAdminRecord({
       id: editingAdminIndex === null ? "" : teamAdminDraft[editingAdminIndex]?.id,
       role,
@@ -2527,11 +2704,7 @@ function wireInputs() {
     if (!state.players.length) return;
     const opening = adminLinkedPlayersWrapEl.classList.contains("is-hidden");
     adminLinkedPlayersWrapEl.classList.toggle("is-hidden", !opening);
-    const selectedIds = Array.from(adminLinkedPlayersListEl.querySelectorAll('input[type="checkbox"]:checked')).map((input) => input.value);
-    renderAdminLinkedPlayerOptions(selectedIds);
-  });
-  adminLinkedPlayersListEl.addEventListener("change", () => {
-    const selectedIds = Array.from(adminLinkedPlayersListEl.querySelectorAll('input[type="checkbox"]:checked')).map((input) => input.value);
+    const selectedIds = getSelectedAdminLinkedPlayerIds();
     renderAdminLinkedPlayerOptions(selectedIds);
   });
   adminEditorListEl.addEventListener("click", (e) => {
@@ -2553,9 +2726,11 @@ function wireInputs() {
     const file = teamLogoEl.files?.[0];
     logoFileNameEl.textContent = file?.name || "No file selected";
     if (!file) {
+      pendingTeamLogoDataUrl = "";
       setTeamLogoPreview(state.team.logoDataUrl || "");
       return;
     }
+    pendingTeamLogoDataUrl = "";
     if (teamLogoPreviewObjectUrl) URL.revokeObjectURL(teamLogoPreviewObjectUrl);
     teamLogoPreviewObjectUrl = URL.createObjectURL(file);
     setTeamLogoPreview(teamLogoPreviewObjectUrl);
@@ -2605,6 +2780,10 @@ function wireInputs() {
     const contactName = contactNameEl.value.trim();
     const contactPhone = contactPhoneEl.value.trim();
     if (!name || !contactName || !contactPhone) return;
+    if (!hasValidPhone(contactPhone)) {
+      openAppDialog({ title: "Contact Phone", message: "Enter a 10-digit phone number.", confirmLabel: "OK", showCancel: false });
+      return;
+    }
     let photoDataUrl = pendingPlayerPhotoDataUrl || "";
     if (!photoDataUrl && playerPhotoEl.files?.[0]) photoDataUrl = await readPlayerPhotoData(playerPhotoEl.files[0]);
     const payload = { id: editingPlayerIndex === null ? crypto.randomUUID() : state.players[editingPlayerIndex]?.id || crypto.randomUUID(), name, number, contactName, contactPhone: formatPhone(contactPhone), photoDataUrl };
@@ -2631,20 +2810,20 @@ function wireInputs() {
     rosterPreviewObjectUrl = URL.createObjectURL(file);
     setRosterPreview(rosterPreviewObjectUrl);
   });
-  contactPhoneEl.addEventListener("blur", () => {
-    contactPhoneEl.value = formatPhone(contactPhoneEl.value);
-  });
-  adminPhoneEl.addEventListener("blur", () => {
-    adminPhoneEl.value = formatPhone(adminPhoneEl.value);
-  });
-  eventLeadPhoneEl.addEventListener("blur", () => {
-    eventLeadPhoneEl.value = formatPhone(eventLeadPhoneEl.value);
-  });
+  applyLivePhoneFormatting(contactPhoneEl);
+  applyLivePhoneFormatting(adminPhoneEl);
+  applyLivePhoneFormatting(eventLeadPhoneEl);
   cropPlayerPhotoBtn.addEventListener("click", () => {
     const file = playerPhotoEl.files?.[0];
-    if (file) { openCropForFile(file).catch(() => {}); return; }
+    if (file) { beginCropFlow("player", file).catch(() => {}); return; }
     const src = playerPhotoPreviewImg.getAttribute("src");
-    if (src) openCropForSource(src).catch(() => {});
+    if (src) beginCropFlow("player", null, src).catch(() => {});
+  });
+  cropTeamLogoBtn?.addEventListener("click", () => {
+    const file = teamLogoEl.files?.[0];
+    if (file) { beginCropFlow("team_logo", file).catch(() => {}); return; }
+    const src = teamLogoPreviewImgEl.getAttribute("src");
+    if (src) beginCropFlow("team_logo", null, src).catch(() => {});
   });
   cropZoomEl.addEventListener("input", () => { cropState.zoom = Number(cropZoomEl.value) || 1; drawCrop(); });
   cropCanvas.addEventListener("pointerdown", (e) => {
@@ -2660,8 +2839,47 @@ function wireInputs() {
   cropCanvas.addEventListener("pointerup", () => { stopCropDrag(); });
   cropCanvas.addEventListener("pointercancel", () => { stopCropDrag(); });
   window.addEventListener("pointerup", () => { stopCropDrag(); });
-  applyCropBtn.addEventListener("click", () => { pendingPlayerPhotoDataUrl = cropCanvas.toDataURL("image/png"); setRosterPreview(pendingPlayerPhotoDataUrl); playerPhotoFileNameEl.textContent = "Cropped photo ready"; playerPhotoEl.value = ""; openCrop(false); });
-  cancelCropBtn.addEventListener("click", () => { playerPhotoEl.value = ""; pendingPlayerPhotoDataUrl = ""; if (editingPlayerIndex !== null && state.players[editingPlayerIndex]?.photoDataUrl) { setRosterPreview(state.players[editingPlayerIndex].photoDataUrl); playerPhotoFileNameEl.textContent = "Current photo on file"; } else { setRosterPreview(""); playerPhotoFileNameEl.textContent = "No file selected"; } openCrop(false); });
+  applyCropBtn.addEventListener("click", () => {
+    const cropped = cropCanvas.toDataURL("image/png");
+    if (cropTarget === "team_logo") {
+      pendingTeamLogoDataUrl = cropped;
+      teamLogoEl.value = "";
+      logoFileNameEl.textContent = "Cropped logo ready";
+      setTeamLogoPreview(pendingTeamLogoDataUrl);
+    } else {
+      pendingPlayerPhotoDataUrl = cropped;
+      playerPhotoEl.value = "";
+      playerPhotoFileNameEl.textContent = "Cropped photo ready";
+      setRosterPreview(pendingPlayerPhotoDataUrl);
+    }
+    cropTarget = "";
+    openCrop(false);
+  });
+  cancelCropBtn.addEventListener("click", () => {
+    if (cropTarget === "team_logo") {
+      teamLogoEl.value = "";
+      pendingTeamLogoDataUrl = "";
+      if (state.team.logoDataUrl) {
+        setTeamLogoPreview(state.team.logoDataUrl);
+        logoFileNameEl.textContent = "Current logo on file";
+      } else {
+        setTeamLogoPreview("");
+        logoFileNameEl.textContent = "No file selected";
+      }
+    } else {
+      playerPhotoEl.value = "";
+      pendingPlayerPhotoDataUrl = "";
+      if (editingPlayerIndex !== null && state.players[editingPlayerIndex]?.photoDataUrl) {
+        setRosterPreview(state.players[editingPlayerIndex].photoDataUrl);
+        playerPhotoFileNameEl.textContent = "Current photo on file";
+      } else {
+        setRosterPreview("");
+        playerPhotoFileNameEl.textContent = "No file selected";
+      }
+    }
+    cropTarget = "";
+    openCrop(false);
+  });
 
   eventTypeEl.addEventListener("change", () => {
     const type = normalizeType(eventTypeEl.value);
@@ -2706,6 +2924,25 @@ function wireInputs() {
       } else {
         row.remove();
         ensureDraftRafflePrizeRow();
+      }
+      return;
+    }
+    const supplyActionBtn = raw.closest(".scheduled-supply-action-btn");
+    if (supplyActionBtn) {
+      const action = supplyActionBtn.getAttribute("data-row-action") || "remove";
+      const row = supplyActionBtn.closest('[data-supply-row="1"]');
+      if (!row) return;
+      if (action === "add") {
+        if (!isSupplyRowFilled(row)) return;
+        row.setAttribute("data-row-state", "saved");
+        supplyActionBtn.textContent = "Remove";
+        supplyActionBtn.setAttribute("data-row-action", "remove");
+        ensureDraftSupplyRow();
+        const draftName = eventTypeDetailsEl.querySelector('[data-supply-row="1"][data-row-state="draft"] .scheduled-supply-name');
+        if (draftName instanceof HTMLInputElement) draftName.focus();
+      } else {
+        row.remove();
+        ensureDraftSupplyRow();
       }
       return;
     }
@@ -2928,7 +3165,7 @@ function wireInputs() {
     const moneyBtn = t.closest(".canning-slot-money-btn");
     if (moneyBtn) {
       const e = getEventById(selectedEventId);
-      if (!e || normalizeType(e.type) !== "canning") return;
+      if (!e || !isScheduledShiftEvent(e.type)) return;
       const slotKey = moneyBtn.dataset.slotKey || "";
       if (!slotKey) return;
       const current = Number(moneyBtn.dataset.slotRaised || "0") || 0;
@@ -2979,7 +3216,7 @@ function wireInputs() {
     const slotBtn = t.closest(".canning-slot-assign-btn");
     if (!slotBtn) return;
     const e = getEventById(selectedEventId);
-    if (!e || normalizeType(e.type) !== "canning") return;
+    if (!e || !isScheduledShiftEvent(e.type)) return;
     const slotKey = slotBtn.dataset.slotKey || "";
     if (!slotKey) return;
     selectedSlotKey = slotKey;
@@ -3069,11 +3306,15 @@ function wireInputs() {
     const leadName = eventLeadNameEl.value.trim();
     const leadPhone = eventLeadPhoneEl.value.trim();
     if (!title || !type || !leadName || !leadPhone) return;
+    if (!hasValidPhone(leadPhone)) {
+      openAppDialog({ title: "Lead Phone", message: "Enter a 10-digit phone number.", confirmLabel: "OK", showCancel: false });
+      return;
+    }
     const details = collectTypeDetails(type, existingEvent?.details || {});
-    if (type === "canning") {
-      const error = validateCanningDetails(details);
+    if (isScheduledShiftEvent(type)) {
+      const error = validateScheduledEventDetails(details, type);
       if (error) {
-        openAppDialog({ title: "Canning Validation", message: error, confirmLabel: "OK", showCancel: false });
+        openAppDialog({ title: getScheduledEventConfig(type).validationTitle, message: error, confirmLabel: "OK", showCancel: false });
         return;
       }
     }
