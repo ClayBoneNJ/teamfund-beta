@@ -163,7 +163,7 @@
         </div>
 
         <div class="inline-form team-form-actions">
-          <button type="submit">Save Team Info</button>
+          <button type="submit" id="saveTeamBtn" class="primary-save-btn">Save Team Info</button>
           <button type="button" id="resetTeamBtn">Reset All</button>
           <button type="button" id="cancelTeamBtn">Cancel</button>
         </div>
@@ -213,6 +213,7 @@
           <span class="field-label">Picture</span>
           <div class="logo-upload">
             <label for="adminPhoto" class="file-trigger">Add Photo</label>
+            <button type="button" id="cropAdminPhotoBtn">Crop Photo</button>
             <span class="file-name" id="adminPhotoFileName">No file selected</span>
             <input id="adminPhoto" type="file" accept="image/*" />
           </div>
@@ -334,7 +335,9 @@
           <div class="lead-contact-grid">
             <div class="stack-sm">
               <label class="field-label" for="eventLeadName">Name</label>
-              <input id="eventLeadName" type="text" placeholder="Parent/Volunteer Name" required />
+              <select id="eventLeadName" required>
+                <option value="">Select roster contact</option>
+              </select>
             </div>
             <div class="stack-sm">
               <label class="field-label" for="eventLeadPhone">Phone</label>
@@ -346,7 +349,6 @@
             </div>
           </div>
         </div>
-
         <div id="eventTypeDetails" class="stack-md"></div>
 
         <div class="stack-sm">
@@ -594,7 +596,7 @@
     <div class="modal-backdrop"></div>
     <section class="modal-panel card">
       <div class="card-head">
-        <h2>Crop Player Photo</h2>
+        <h2 id="photoCropTitle">Crop Photo</h2>
       </div>
       <div class="stack-md">
         <div class="crop-canvas-wrap">

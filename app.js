@@ -19,6 +19,7 @@ const DEFAULT_TEAM_STATE = {
   color2: "#ffffff",
   accent: "#ffffff",
   logoDataUrl: "",
+  logoSourceDataUrl: "",
   venmoQr: null,
   zelleQr: null,
 };
@@ -37,6 +38,7 @@ const RESET_TEAM_STATE = {
   color2: "#ffffff",
   accent: "#ffffff",
   logoDataUrl: "",
+  logoSourceDataUrl: "",
   venmoQr: null,
   zelleQr: null,
 };
@@ -71,6 +73,7 @@ const adminNameEl = $("adminName");
 const adminPhoneEl = $("adminPhone");
 const adminEmailEl = $("adminEmail");
 const adminPhotoEl = $("adminPhoto");
+const cropAdminPhotoBtn = $("cropAdminPhotoBtn");
 const adminPhotoFileNameEl = $("adminPhotoFileName");
 const adminPhotoPreviewWrapEl = $("adminPhotoPreviewWrap");
 const adminPhotoPreviewImgEl = $("adminPhotoPreviewImg");
@@ -121,6 +124,7 @@ const playerPhotoFileNameEl = $("playerPhotoFileName");
 const playerPhotoPreviewWrap = $("playerPhotoPreviewWrap");
 const playerPhotoPreviewImg = $("playerPhotoPreviewImg");
 const photoCropModal = $("photoCropModal");
+const photoCropTitleEl = $("photoCropTitle");
 const cropCanvas = $("cropCanvas");
 const cropZoomEl = $("cropZoom");
 const applyCropBtn = $("applyCropBtn");
@@ -235,9 +239,12 @@ let selectedPlayerAnchor = null;
 let selectedAdminAnchor = null;
 let pendingPlayerPhotoDataUrl = "";
 let pendingTeamLogoDataUrl = "";
+let pendingPlayerPhotoSourceDataUrl = "";
+let pendingTeamLogoSourceDataUrl = "";
 let rosterPreviewObjectUrl = "";
 let editingAdminIndex = null;
 let pendingAdminPhotoDataUrl = "";
+let pendingAdminPhotoSourceDataUrl = "";
 let adminPreviewObjectUrl = "";
 let teamLogoPreviewObjectUrl = "";
 let cropTarget = "";
@@ -265,7 +272,7 @@ let stateSaveInFlight = false;
 let stateSaveQueued = false;
 let stateSaveWarned = false;
 
-const cropState = { image: null, zoom: 1, baseScale: 1, offsetX: 0, offsetY: 0, dragging: false, lastX: 0, lastY: 0 };
+const cropState = { image: null, sourceDataUrl: "", zoom: 1, baseScale: 1, offsetX: 0, offsetY: 0, dragging: false, lastX: 0, lastY: 0 };
 const PDFJS_WORKER_SRC = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
 const ADMIN_ROLE_OPTIONS = [
   { value: "head_coach", label: "Head Coach" },
@@ -382,8 +389,26 @@ function normalizeAdminRole(role) {
 function getPlayerId(player) {
   return String(player?.id || "").trim() || crypto.randomUUID();
 }
+function normalizeImageSource(source, fallback = "") {
+  const value = String(source || fallback || "").trim();
+  return value;
+}
+function normalizePlayerRecord(player) {
+  const photoDataUrl = normalizeImageSource(player?.photoDataUrl);
+  return {
+    ...player,
+    id: getPlayerId(player),
+    name: String(player?.name || "").trim(),
+    number: String(player?.number || "").trim(),
+    contactName: String(player?.contactName || "").trim(),
+    contactPhone: formatPhone(player?.contactPhone || ""),
+    photoDataUrl,
+    photoSourceDataUrl: normalizeImageSource(player?.photoSourceDataUrl, photoDataUrl),
+  };
+}
 function normalizeAdminRecord(admin) {
   const role = normalizeAdminRole(admin?.role);
+  const photoDataUrl = normalizeImageSource(admin?.photoDataUrl);
   return {
     id: String(admin?.id || "").trim() || crypto.randomUUID(),
     role,
@@ -391,9 +416,69 @@ function normalizeAdminRecord(admin) {
     name: String(admin?.name || "").trim(),
     phone: formatPhone(admin?.phone || ""),
     email: String(admin?.email || "").trim(),
-    photoDataUrl: String(admin?.photoDataUrl || "").trim(),
+    photoDataUrl,
+    photoSourceDataUrl: normalizeImageSource(admin?.photoSourceDataUrl, photoDataUrl),
     linkedPlayerIds: Array.isArray(admin?.linkedPlayerIds) ? admin.linkedPlayerIds.map((id) => String(id || "").trim()).filter(Boolean) : [],
   };
+}
+function getTeamLogoSource(team) {
+  return normalizeImageSource(team?.logoSourceDataUrl, team?.logoDataUrl);
+}
+function buildPlayerPillLabel(player) {
+  const parts = [];
+  const name = String(player?.name || "").trim();
+  if (name) parts.push(`<strong>${escapeHtml(name)}</strong>`);
+  if (player?.contactName) parts.push(`<span class="player-contact-pill">${escapeHtml(player.contactName)}</span>`);
+  return `<span class="player-pill-copy">${parts.join("")}</span>`;
+}
+function buildPlayerPillMedia(player, fallbackInitial = "P") {
+  const number = String(player?.number || "").trim();
+  const name = String(player?.name || "").trim() || "Unnamed Player";
+  const initials = getInitials(name, fallbackInitial);
+  const avatar = player?.photoDataUrl ? `<img src="${player.photoDataUrl}" alt="${escapeHtml(name)} photo" />` : `<span>${escapeHtml(initials)}</span>`;
+  return `${number ? `<span class="player-pill-number">#${escapeHtml(number)}</span>` : ""}<span class="player-avatar">${avatar}</span>${buildPlayerPillLabel({ ...player, name })}`;
+}
+function renderEventLeadContactOptions(selectedName = "") {
+  if (!eventLeadNameEl) return;
+  const currentValue = String(selectedName || eventLeadNameEl.value || "").trim();
+  const contacts = [];
+  const seen = new Set();
+  state.players.forEach((player) => {
+    const contactName = String(player?.contactName || "").trim();
+    if (!contactName) return;
+    const key = contactName.toLowerCase();
+    if (seen.has(key)) return;
+    seen.add(key);
+    contacts.push({
+      name: contactName,
+      label: [contactName, String(player?.name || "").trim(), formatPhone(player?.contactPhone || "")]
+        .filter(Boolean)
+        .join(" | "),
+    });
+  });
+  if (currentValue && !seen.has(currentValue.toLowerCase())) {
+    contacts.unshift({ name: currentValue, label: `${currentValue} | Current` });
+  }
+  eventLeadNameEl.innerHTML = "";
+  const placeholder = document.createElement("option");
+  placeholder.value = "";
+  placeholder.textContent = contacts.length ? "Select roster contact" : "No roster contacts yet";
+  eventLeadNameEl.appendChild(placeholder);
+  contacts.forEach((contact) => {
+    const option = document.createElement("option");
+    option.value = contact.name;
+    option.textContent = contact.label;
+    eventLeadNameEl.appendChild(option);
+  });
+  eventLeadNameEl.value = currentValue;
+}
+function syncEventLeadFromRosterContact() {
+  const rawName = String(eventLeadNameEl?.value || "").trim().toLowerCase();
+  if (!rawName) return;
+  const matches = state.players.filter((player) => String(player?.contactName || "").trim().toLowerCase() === rawName);
+  if (matches.length !== 1) return;
+  const [match] = matches;
+  if (match.contactPhone) eventLeadPhoneEl.value = formatPhone(match.contactPhone);
 }
 function migrateLegacyAdmins(team) {
   const migrated = [];
@@ -480,11 +565,7 @@ function writeStateToDb(snapshot) {
 }
 function applyParsedState(parsed) {
   if (!parsed || typeof parsed !== "object") return;
-  state.players = Array.isArray(parsed.players) ? parsed.players.map((player) => ({
-    ...player,
-    id: getPlayerId(player),
-    contactPhone: formatPhone(player?.contactPhone || ""),
-  })) : [];
+  state.players = Array.isArray(parsed.players) ? parsed.players.map((player) => normalizePlayerRecord(player)) : [];
   state.events = Array.isArray(parsed.events) ? parsed.events.map((e) => ({
     ...e,
     type: normalizeType(e.type),
@@ -497,6 +578,7 @@ function applyParsedState(parsed) {
   syncAllRaisedTotals();
   const parsedTeam = { ...DEFAULT_TEAM_STATE, ...state.team, ...(parsed.team || {}) };
   parsedTeam.admins = getNormalizedAdmins(parsedTeam);
+  parsedTeam.logoSourceDataUrl = getTeamLogoSource(parsedTeam);
   state.team = parsedTeam;
 }
 function resetAllData() {
@@ -506,7 +588,10 @@ function resetAllData() {
   teamAdminDraft = [];
   editingAdminIndex = null;
   pendingAdminPhotoDataUrl = "";
+  pendingAdminPhotoSourceDataUrl = "";
   editingPlayerIndex = null;
+  pendingPlayerPhotoSourceDataUrl = "";
+  pendingTeamLogoSourceDataUrl = "";
   selectedPlayerIndex = null;
   selectedPlayerAnchor = null;
   selectedEventId = null;
@@ -1233,11 +1318,13 @@ function openTeam(open) {
     logoFileNameEl.textContent = "No file selected";
     teamLogoEl.value = "";
     pendingTeamLogoDataUrl = "";
+    pendingTeamLogoSourceDataUrl = "";
     setTeamLogoPreview(state.team.logoDataUrl || "");
     renderAdminEditorList();
   } else {
     openAdmin(false);
     pendingTeamLogoDataUrl = "";
+    pendingTeamLogoSourceDataUrl = "";
     setTeamLogoPreview("");
   }
   teamModal.classList.toggle("is-hidden", !open);
@@ -1257,6 +1344,7 @@ function openAdmin(open) {
   if (!open) {
     editingAdminIndex = null;
     pendingAdminPhotoDataUrl = "";
+    pendingAdminPhotoSourceDataUrl = "";
     adminForm.reset();
     adminRoleEl.value = "head_coach";
     adminCustomLabelWrapEl.classList.add("is-hidden");
@@ -1431,13 +1519,11 @@ function renderAdminLinkedPlayerOptions(selectedIds = []) {
   adminLinkedPlayersSummaryEl.textContent = linkedNames.length ? linkedNames.join(", ") : "No linked players selected.";
   state.players.forEach((player) => {
     const name = String(player.name || "").trim() || "Unnamed Player";
-    const initials = getInitials(name, "P");
-    const avatar = player.photoDataUrl ? `<img src="${player.photoDataUrl}" alt="${escapeHtml(name)} photo" />` : `<span>${escapeHtml(initials)}</span>`;
     const btn = document.createElement("button");
     btn.type = "button";
     btn.className = `player-pill-head slot-assign-player-btn${selected.has(player.id) ? " is-assigned" : ""}`;
     btn.setAttribute("data-player-id", player.id);
-    btn.innerHTML = `<span class="player-avatar">${avatar}</span><strong>${escapeHtml(name)}${player.number ? ` #${escapeHtml(player.number)}` : ""}</strong>`;
+    btn.innerHTML = buildPlayerPillMedia(player, "P");
     btn.addEventListener("click", () => {
       const nextSelected = new Set(getSelectedAdminLinkedPlayerIds());
       if (nextSelected.has(player.id)) nextSelected.delete(player.id);
@@ -1458,6 +1544,7 @@ function resetAdminForm() {
   adminPhoneEl.value = "";
   adminEmailEl.value = "";
   pendingAdminPhotoDataUrl = "";
+  pendingAdminPhotoSourceDataUrl = "";
   adminPhotoEl.value = "";
   adminPhotoFileNameEl.textContent = "No file selected";
   adminLinkedPlayersWrapEl.classList.add("is-hidden");
@@ -1477,6 +1564,7 @@ function fillAdminForm(index) {
   adminPhoneEl.value = admin.phone || "";
   adminEmailEl.value = admin.email || "";
   pendingAdminPhotoDataUrl = "";
+  pendingAdminPhotoSourceDataUrl = admin.photoSourceDataUrl || admin.photoDataUrl || "";
   adminPhotoEl.value = "";
   adminPhotoFileNameEl.textContent = admin.photoDataUrl ? "Current photo on file" : "No file selected";
   adminLinkedPlayersWrapEl.classList.add("is-hidden");
@@ -1537,11 +1625,9 @@ function renderTeam() {
         linkedPlayers.forEach((player) => {
           const playerIndex = state.players.findIndex((entry) => entry.id === player.id);
           if (playerIndex === -1) return;
-          const playerInitials = getInitials(player.name, "P");
-          const playerAvatar = player.photoDataUrl ? `<img src="${player.photoDataUrl}" alt="${escapeHtml(player.name)} photo" />` : `<span>${playerInitials}</span>`;
           const playerPill = document.createElement("li");
           playerPill.className = "player-pill";
-          playerPill.innerHTML = `<button type="button" class="player-pill-head"><span class="player-avatar">${playerAvatar}</span><strong>${escapeHtml(player.name || "")}${player.number ? ` #${escapeHtml(player.number)}` : ""}</strong></button>`;
+          playerPill.innerHTML = `<button type="button" class="player-pill-head">${buildPlayerPillMedia(player, "P")}</button>`;
           playerPill.querySelector(".player-pill-head").addEventListener("click", (event) => {
             event.stopPropagation();
             openAdminDetail(false);
@@ -1611,6 +1697,7 @@ function fillPlayerForm(index) {
   playerPhotoEl.value = "";
   playerPhotoFileNameEl.textContent = p.photoDataUrl ? "Current photo on file" : "No file selected";
   pendingPlayerPhotoDataUrl = "";
+  pendingPlayerPhotoSourceDataUrl = p.photoSourceDataUrl || p.photoDataUrl || "";
   setRosterPreview(p.photoDataUrl || "");
 }
 function openPlayerDetailForIndex(index, anchorEl) {
@@ -1630,17 +1717,16 @@ function openPlayerDetailForIndex(index, anchorEl) {
 function renderRoster() {
   rosterList.innerHTML = "";
   state.players.forEach((p, idx) => {
-    const initials = getInitials(p.name, "P");
-    const avatar = p.photoDataUrl ? `<img src="${p.photoDataUrl}" alt="${escapeHtml(p.name)} photo" />` : `<span>${initials}</span>`;
     const li = document.createElement("li");
     li.className = "player-pill";
-    li.innerHTML = `<button type="button" class="player-pill-head"><span class="player-avatar">${avatar}</span><strong>${escapeHtml(p.name || "")}${p.number ? ` #${escapeHtml(p.number)}` : ""}</strong></button>`;
+    li.innerHTML = `<button type="button" class="player-pill-head">${buildPlayerPillMedia(p, "P")}</button>`;
     li.querySelector(".player-pill-head").addEventListener("click", (e) => {
       openPlayerDetailForIndex(idx, e.currentTarget);
     });
     rosterList.appendChild(li);
   });
   playerCountPill.textContent = `${state.players.length} player${state.players.length === 1 ? "" : "s"}`;
+  renderEventLeadContactOptions();
   updateRosterListScrollState();
 }
 function positionPlayerDetail() {
@@ -2144,6 +2230,7 @@ function resetEventFormState() {
   editingEventRemovedFlyerIndices = new Set();
   eventFormRenderedType = "";
   eventForm.reset();
+  renderEventLeadContactOptions("");
   eventTitleEl.placeholder = getSuggestedEventTitlePlaceholder("");
   eventTypeDetailsEl.innerHTML = "";
   eventFlyersEl.value = "";
@@ -2197,7 +2284,7 @@ function startEditingEvent(event) {
   if (saveEventBtn) saveEventBtn.textContent = "Save Changes";
   eventTitleEl.value = event.title || "";
   eventTitleEl.placeholder = getSuggestedEventTitlePlaceholder(event.type);
-  eventLeadNameEl.value = event.lead?.name || "";
+  renderEventLeadContactOptions(event.lead?.name || "");
   eventLeadPhoneEl.value = event.lead?.phone || "";
   eventLeadEmailEl.value = event.lead?.email || "";
   eventTypeEl.value = normalizeType(event.type);
@@ -2379,12 +2466,10 @@ function renderSlotAssignRoster() {
   }
   players.forEach((player) => {
     const name = String(player.name || "").trim();
-    const initials = getInitials(name, "P");
-    const avatar = player.photoDataUrl ? `<img src="${player.photoDataUrl}" alt="${escapeHtml(name)} photo" />` : `<span>${initials}</span>`;
     const btn = document.createElement("button");
     btn.type = "button";
     btn.className = `player-pill-head slot-assign-player-btn${assignedNames.includes(name) ? " is-assigned" : ""}`;
-    btn.innerHTML = `<span class="player-avatar">${avatar}</span><strong>${escapeHtml(name)}${player.number ? ` #${escapeHtml(player.number)}` : ""}</strong>`;
+    btn.innerHTML = buildPlayerPillMedia(player, "P");
     btn.addEventListener("click", () => {
       const nextAssigned = Array.isArray(slotAssignDraftNames) ? slotAssignDraftNames.slice() : [];
       const idx = nextAssigned.indexOf(name);
@@ -2462,7 +2547,7 @@ function renderEvents() {
   updateEventListScrollState();
 }
 
-function initCrop(image) { cropState.image = image; cropState.zoom = 1; cropState.baseScale = Math.max(cropCanvas.width / image.width, cropCanvas.height / image.height); cropState.offsetX = 0; cropState.offsetY = 0; cropZoomEl.value = "1"; }
+function initCrop(image, sourceDataUrl = "") { cropState.image = image; cropState.sourceDataUrl = sourceDataUrl; cropState.zoom = 1; cropState.baseScale = Math.max(cropCanvas.width / image.width, cropCanvas.height / image.height); cropState.offsetX = 0; cropState.offsetY = 0; cropZoomEl.value = "1"; }
 function drawCrop() {
   if (!cropState.image) return;
   const ctx = cropCanvas.getContext("2d");
@@ -2480,10 +2565,11 @@ function openCropForFile(file) {
   return new Promise((resolve, reject) => {
     const fr = new FileReader();
     fr.onload = () => {
+      const sourceDataUrl = String(fr.result || "");
       const img = new Image();
-      img.onload = () => { initCrop(img); openCrop(true); drawCrop(); resolve(); };
+      img.onload = () => { initCrop(img, sourceDataUrl); openCrop(true); drawCrop(); resolve(); };
       img.onerror = () => reject(new Error("img load fail"));
-      img.src = fr.result;
+      img.src = sourceDataUrl;
     };
     fr.onerror = () => reject(new Error("file read fail"));
     fr.readAsDataURL(file);
@@ -2492,13 +2578,16 @@ function openCropForFile(file) {
 function openCropForSource(src) {
   return new Promise((resolve, reject) => {
     const img = new Image();
-    img.onload = () => { initCrop(img); openCrop(true); drawCrop(); resolve(); };
+    img.onload = () => { initCrop(img, src); openCrop(true); drawCrop(); resolve(); };
     img.onerror = () => reject(new Error("img load fail"));
     img.src = src;
   });
 }
 function beginCropFlow(target, file = null, src = "") {
   cropTarget = target;
+  if (photoCropTitleEl) {
+    photoCropTitleEl.textContent = target === "team_logo" ? "Crop Team Logo" : target === "admin_photo" ? "Crop Admin Photo" : "Crop Player Photo";
+  }
   if (file) return openCropForFile(file);
   if (src) return openCropForSource(src);
   return Promise.resolve();
@@ -2639,8 +2728,14 @@ function wireInputs() {
     state.team.color1 = teamColor1El.value;
     state.team.color2 = teamColor2El.value;
     state.team.accent = teamAccentEl.value;
-    if (pendingTeamLogoDataUrl) state.team.logoDataUrl = pendingTeamLogoDataUrl;
-    else if (teamLogoEl.files?.[0]) state.team.logoDataUrl = await readFileAsDataUrl(teamLogoEl.files[0]);
+    if (pendingTeamLogoDataUrl) {
+      state.team.logoDataUrl = pendingTeamLogoDataUrl;
+      state.team.logoSourceDataUrl = pendingTeamLogoSourceDataUrl || pendingTeamLogoDataUrl;
+    } else if (teamLogoEl.files?.[0]) {
+      const logoSrc = await readPlayerPhotoData(teamLogoEl.files[0]);
+      state.team.logoDataUrl = logoSrc;
+      state.team.logoSourceDataUrl = logoSrc;
+    }
     applyTheme(); renderTeam(); openTeam(false); saveState();
   });
   openAdminBtn.addEventListener("click", () => {
@@ -2668,7 +2763,11 @@ function wireInputs() {
       return;
     }
     let photoDataUrl = pendingAdminPhotoDataUrl || "";
-    if (!photoDataUrl && adminPhotoEl.files?.[0]) photoDataUrl = await readPlayerPhotoData(adminPhotoEl.files[0]);
+    let photoSourceDataUrl = pendingAdminPhotoSourceDataUrl || "";
+    if (!photoDataUrl && adminPhotoEl.files?.[0]) {
+      photoDataUrl = await readPlayerPhotoData(adminPhotoEl.files[0]);
+      photoSourceDataUrl = photoDataUrl;
+    }
     const linkedPlayerIds = getSelectedAdminLinkedPlayerIds();
     const payload = normalizeAdminRecord({
       id: editingAdminIndex === null ? "" : teamAdminDraft[editingAdminIndex]?.id,
@@ -2678,6 +2777,7 @@ function wireInputs() {
       phone,
       email: adminEmailEl.value.trim(),
       photoDataUrl: photoDataUrl || teamAdminDraft[editingAdminIndex]?.photoDataUrl || "",
+      photoSourceDataUrl: photoSourceDataUrl || teamAdminDraft[editingAdminIndex]?.photoSourceDataUrl || teamAdminDraft[editingAdminIndex]?.photoDataUrl || "",
       linkedPlayerIds,
     });
     if (editingAdminIndex === null) teamAdminDraft.push(payload);
@@ -2691,11 +2791,13 @@ function wireInputs() {
     adminPhotoFileNameEl.textContent = file ? file.name : "No file selected";
     if (!file) {
       pendingAdminPhotoDataUrl = "";
+      pendingAdminPhotoSourceDataUrl = "";
       const existingPhoto = editingAdminIndex !== null ? teamAdminDraft[editingAdminIndex]?.photoDataUrl : "";
       setAdminPhotoPreview(existingPhoto || "");
       return;
     }
     pendingAdminPhotoDataUrl = "";
+    pendingAdminPhotoSourceDataUrl = "";
     if (adminPreviewObjectUrl) URL.revokeObjectURL(adminPreviewObjectUrl);
     adminPreviewObjectUrl = URL.createObjectURL(file);
     setAdminPhotoPreview(adminPreviewObjectUrl);
@@ -2727,10 +2829,12 @@ function wireInputs() {
     logoFileNameEl.textContent = file?.name || "No file selected";
     if (!file) {
       pendingTeamLogoDataUrl = "";
+      pendingTeamLogoSourceDataUrl = "";
       setTeamLogoPreview(state.team.logoDataUrl || "");
       return;
     }
     pendingTeamLogoDataUrl = "";
+    pendingTeamLogoSourceDataUrl = "";
     if (teamLogoPreviewObjectUrl) URL.revokeObjectURL(teamLogoPreviewObjectUrl);
     teamLogoPreviewObjectUrl = URL.createObjectURL(file);
     setTeamLogoPreview(teamLogoPreviewObjectUrl);
@@ -2770,8 +2874,8 @@ function wireInputs() {
     saveState();
   });
 
-  openRosterBtn.addEventListener("click", () => { editingPlayerIndex = null; rosterModalTitle.textContent = "Add Player"; savePlayerBtn.textContent = "Save Player"; playerForm.reset(); pendingPlayerPhotoDataUrl = ""; playerPhotoFileNameEl.textContent = "No file selected"; setRosterPreview(""); openRoster(true); });
-  cancelRosterBtn.addEventListener("click", () => { editingPlayerIndex = null; rosterModalTitle.textContent = "Add Player"; savePlayerBtn.textContent = "Save Player"; playerForm.reset(); pendingPlayerPhotoDataUrl = ""; playerPhotoFileNameEl.textContent = "No file selected"; setRosterPreview(""); openRoster(false); });
+  openRosterBtn.addEventListener("click", () => { editingPlayerIndex = null; rosterModalTitle.textContent = "Add Player"; savePlayerBtn.textContent = "Save Player"; playerForm.reset(); pendingPlayerPhotoDataUrl = ""; pendingPlayerPhotoSourceDataUrl = ""; playerPhotoFileNameEl.textContent = "No file selected"; setRosterPreview(""); openRoster(true); });
+  cancelRosterBtn.addEventListener("click", () => { editingPlayerIndex = null; rosterModalTitle.textContent = "Add Player"; savePlayerBtn.textContent = "Save Player"; playerForm.reset(); pendingPlayerPhotoDataUrl = ""; pendingPlayerPhotoSourceDataUrl = ""; playerPhotoFileNameEl.textContent = "No file selected"; setRosterPreview(""); openRoster(false); });
   editPlayerFromDetailBtn.addEventListener("click", () => { if (selectedPlayerIndex === null) return; fillPlayerForm(selectedPlayerIndex); openPlayerDetail(false); selectedPlayerAnchor = null; openRoster(true); });
   playerForm.addEventListener("submit", async (e) => {
     e.preventDefault();
@@ -2785,15 +2889,20 @@ function wireInputs() {
       return;
     }
     let photoDataUrl = pendingPlayerPhotoDataUrl || "";
-    if (!photoDataUrl && playerPhotoEl.files?.[0]) photoDataUrl = await readPlayerPhotoData(playerPhotoEl.files[0]);
-    const payload = { id: editingPlayerIndex === null ? crypto.randomUUID() : state.players[editingPlayerIndex]?.id || crypto.randomUUID(), name, number, contactName, contactPhone: formatPhone(contactPhone), photoDataUrl };
-    if (editingPlayerIndex === null) state.players.push(payload);
-    else state.players[editingPlayerIndex] = { ...state.players[editingPlayerIndex], ...payload, photoDataUrl: payload.photoDataUrl || state.players[editingPlayerIndex].photoDataUrl || "" };
+    let photoSourceDataUrl = pendingPlayerPhotoSourceDataUrl || "";
+    if (!photoDataUrl && playerPhotoEl.files?.[0]) {
+      photoDataUrl = await readPlayerPhotoData(playerPhotoEl.files[0]);
+      photoSourceDataUrl = photoDataUrl;
+    }
+    const payload = { id: editingPlayerIndex === null ? crypto.randomUUID() : state.players[editingPlayerIndex]?.id || crypto.randomUUID(), name, number, contactName, contactPhone: formatPhone(contactPhone), photoDataUrl, photoSourceDataUrl };
+    if (editingPlayerIndex === null) state.players.push(normalizePlayerRecord(payload));
+    else state.players[editingPlayerIndex] = normalizePlayerRecord({ ...state.players[editingPlayerIndex], ...payload, photoDataUrl: payload.photoDataUrl || state.players[editingPlayerIndex].photoDataUrl || "", photoSourceDataUrl: payload.photoSourceDataUrl || state.players[editingPlayerIndex].photoSourceDataUrl || state.players[editingPlayerIndex].photoDataUrl || "" });
     editingPlayerIndex = null;
     rosterModalTitle.textContent = "Add Player";
     savePlayerBtn.textContent = "Save Player";
     playerForm.reset();
     pendingPlayerPhotoDataUrl = "";
+    pendingPlayerPhotoSourceDataUrl = "";
     playerPhotoFileNameEl.textContent = "No file selected";
     setRosterPreview("");
     renderRoster();
@@ -2804,8 +2913,9 @@ function wireInputs() {
   playerPhotoEl.addEventListener("change", () => {
     const file = playerPhotoEl.files?.[0];
     playerPhotoFileNameEl.textContent = file ? file.name : "No file selected";
-    if (!file) { pendingPlayerPhotoDataUrl = ""; if (editingPlayerIndex !== null && state.players[editingPlayerIndex]?.photoDataUrl) setRosterPreview(state.players[editingPlayerIndex].photoDataUrl); else setRosterPreview(""); return; }
+    if (!file) { pendingPlayerPhotoDataUrl = ""; pendingPlayerPhotoSourceDataUrl = ""; if (editingPlayerIndex !== null && state.players[editingPlayerIndex]?.photoDataUrl) setRosterPreview(state.players[editingPlayerIndex].photoDataUrl); else setRosterPreview(""); return; }
     pendingPlayerPhotoDataUrl = "";
+    pendingPlayerPhotoSourceDataUrl = "";
     if (rosterPreviewObjectUrl) URL.revokeObjectURL(rosterPreviewObjectUrl);
     rosterPreviewObjectUrl = URL.createObjectURL(file);
     setRosterPreview(rosterPreviewObjectUrl);
@@ -2816,13 +2926,19 @@ function wireInputs() {
   cropPlayerPhotoBtn.addEventListener("click", () => {
     const file = playerPhotoEl.files?.[0];
     if (file) { beginCropFlow("player", file).catch(() => {}); return; }
-    const src = playerPhotoPreviewImg.getAttribute("src");
+    const src = pendingPlayerPhotoSourceDataUrl || state.players[editingPlayerIndex]?.photoSourceDataUrl || playerPhotoPreviewImg.getAttribute("src");
     if (src) beginCropFlow("player", null, src).catch(() => {});
+  });
+  cropAdminPhotoBtn?.addEventListener("click", () => {
+    const file = adminPhotoEl.files?.[0];
+    if (file) { beginCropFlow("admin_photo", file).catch(() => {}); return; }
+    const src = pendingAdminPhotoSourceDataUrl || teamAdminDraft[editingAdminIndex]?.photoSourceDataUrl || adminPhotoPreviewImgEl.getAttribute("src");
+    if (src) beginCropFlow("admin_photo", null, src).catch(() => {});
   });
   cropTeamLogoBtn?.addEventListener("click", () => {
     const file = teamLogoEl.files?.[0];
     if (file) { beginCropFlow("team_logo", file).catch(() => {}); return; }
-    const src = teamLogoPreviewImgEl.getAttribute("src");
+    const src = pendingTeamLogoSourceDataUrl || state.team.logoSourceDataUrl || teamLogoPreviewImgEl.getAttribute("src");
     if (src) beginCropFlow("team_logo", null, src).catch(() => {});
   });
   cropZoomEl.addEventListener("input", () => { cropState.zoom = Number(cropZoomEl.value) || 1; drawCrop(); });
@@ -2843,11 +2959,19 @@ function wireInputs() {
     const cropped = cropCanvas.toDataURL("image/png");
     if (cropTarget === "team_logo") {
       pendingTeamLogoDataUrl = cropped;
+      pendingTeamLogoSourceDataUrl = cropState.sourceDataUrl || pendingTeamLogoSourceDataUrl || state.team.logoSourceDataUrl || cropped;
       teamLogoEl.value = "";
       logoFileNameEl.textContent = "Cropped logo ready";
       setTeamLogoPreview(pendingTeamLogoDataUrl);
+    } else if (cropTarget === "admin_photo") {
+      pendingAdminPhotoDataUrl = cropped;
+      pendingAdminPhotoSourceDataUrl = cropState.sourceDataUrl || pendingAdminPhotoSourceDataUrl || teamAdminDraft[editingAdminIndex]?.photoSourceDataUrl || cropped;
+      adminPhotoEl.value = "";
+      adminPhotoFileNameEl.textContent = "Cropped photo ready";
+      setAdminPhotoPreview(pendingAdminPhotoDataUrl);
     } else {
       pendingPlayerPhotoDataUrl = cropped;
+      pendingPlayerPhotoSourceDataUrl = cropState.sourceDataUrl || pendingPlayerPhotoSourceDataUrl || state.players[editingPlayerIndex]?.photoSourceDataUrl || cropped;
       playerPhotoEl.value = "";
       playerPhotoFileNameEl.textContent = "Cropped photo ready";
       setRosterPreview(pendingPlayerPhotoDataUrl);
@@ -2859,6 +2983,7 @@ function wireInputs() {
     if (cropTarget === "team_logo") {
       teamLogoEl.value = "";
       pendingTeamLogoDataUrl = "";
+      pendingTeamLogoSourceDataUrl = "";
       if (state.team.logoDataUrl) {
         setTeamLogoPreview(state.team.logoDataUrl);
         logoFileNameEl.textContent = "Current logo on file";
@@ -2866,9 +2991,21 @@ function wireInputs() {
         setTeamLogoPreview("");
         logoFileNameEl.textContent = "No file selected";
       }
+    } else if (cropTarget === "admin_photo") {
+      adminPhotoEl.value = "";
+      pendingAdminPhotoDataUrl = "";
+      pendingAdminPhotoSourceDataUrl = "";
+      if (editingAdminIndex !== null && teamAdminDraft[editingAdminIndex]?.photoDataUrl) {
+        setAdminPhotoPreview(teamAdminDraft[editingAdminIndex].photoDataUrl);
+        adminPhotoFileNameEl.textContent = "Current photo on file";
+      } else {
+        setAdminPhotoPreview("");
+        adminPhotoFileNameEl.textContent = "No file selected";
+      }
     } else {
       playerPhotoEl.value = "";
       pendingPlayerPhotoDataUrl = "";
+      pendingPlayerPhotoSourceDataUrl = "";
       if (editingPlayerIndex !== null && state.players[editingPlayerIndex]?.photoDataUrl) {
         setRosterPreview(state.players[editingPlayerIndex].photoDataUrl);
         playerPhotoFileNameEl.textContent = "Current photo on file";
@@ -2880,6 +3017,9 @@ function wireInputs() {
     cropTarget = "";
     openCrop(false);
   });
+  eventLeadNameEl?.addEventListener("input", () => { syncEventLeadFromRosterContact(); });
+  eventLeadNameEl?.addEventListener("change", () => { syncEventLeadFromRosterContact(); });
+  eventLeadNameEl?.addEventListener("blur", () => { syncEventLeadFromRosterContact(); });
 
   eventTypeEl.addEventListener("change", () => {
     const type = normalizeType(eventTypeEl.value);
