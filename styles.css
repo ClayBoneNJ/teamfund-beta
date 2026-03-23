@@ -420,10 +420,15 @@ body.modal-open {
 
 .scheduled-supply-assign-btn,
 .scheduled-supply-detail-assign-btn {
+  width: auto;
   min-height: 42px;
+  display: inline-flex;
   justify-content: flex-start;
+  align-items: center;
   text-align: left;
   box-shadow: none;
+  border-radius: 18px;
+  padding: 7px 10px;
 }
 
 .scheduled-supply-assign-btn.is-empty,
@@ -431,24 +436,24 @@ body.modal-open {
   background: rgba(8, 12, 30, 0.72);
   border-color: rgba(var(--team1-rgb), 0.42);
   text-shadow: none;
+  border-style: dashed;
 }
 
 .scheduled-supply-assign-btn.has-assignee,
 .scheduled-supply-detail-assign-btn.has-assignee {
-  padding: 6px 8px;
-  background: rgba(9, 14, 33, 0.78);
-  border-color: rgba(var(--team-accent-rgb), 0.42);
+  background: linear-gradient(135deg, rgba(18, 28, 62, 0.9), rgba(9, 14, 33, 0.88));
+  border-color: rgba(var(--team-accent-rgb), 0.34);
 }
 
 .scheduled-supply-assign-placeholder {
-  color: #c4d0ff;
-  font-size: 0.82rem;
+  color: #aebde9;
+  font-size: 0.78rem;
   font-weight: 700;
 }
 
 .scheduled-supply-assign-pill {
-  display: block;
-  width: 100%;
+  display: inline-flex;
+  max-width: 100%;
 }
 
 .scheduled-supply-assign-btn .player-name-number,
@@ -458,9 +463,9 @@ body.modal-open {
 
 .scheduled-supply-assign-btn .player-avatar,
 .scheduled-supply-detail-assign-btn .player-avatar {
-  width: 34px;
-  height: 34px;
-  font-size: 0.62rem;
+  width: 30px;
+  height: 30px;
+  font-size: 0.58rem;
 }
 
 .scheduled-supply-assign-btn .player-pill-copy,
@@ -470,7 +475,12 @@ body.modal-open {
 
 .scheduled-supply-assign-btn .player-pill-copy strong,
 .scheduled-supply-detail-assign-btn .player-pill-copy strong {
-  font-size: 0.82rem;
+  font-size: 0.8rem;
+}
+
+.scheduled-supply-assign-btn .player-pill-copy span,
+.scheduled-supply-detail-assign-btn .player-pill-copy span {
+  display: none;
 }
 
 .scheduled-supply-actions {
@@ -659,7 +669,7 @@ body.modal-open {
 
 .scheduled-supply-checklist-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 170px;
+  grid-template-columns: minmax(0, 1fr) auto;
   gap: 12px;
   align-items: center;
   border: 1px solid rgba(var(--team1-rgb), 0.28);
@@ -722,10 +732,13 @@ body.modal-open {
 .scheduled-supply-checklist-assign {
   display: grid;
   gap: 5px;
+  justify-items: start;
+  align-self: start;
 }
 
 .scheduled-supply-detail-assign-btn {
-  width: 100%;
+  width: auto;
+  max-width: 100%;
 }
 
 .gap-lg {
