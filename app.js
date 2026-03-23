@@ -188,7 +188,9 @@ const eventDetailUpdateRaisedBtn = $("eventDetailUpdateRaisedBtn");
 const eventDetailAddFlyerBtn = $("eventDetailAddFlyerBtn");
 const slotAssignModal = $("slotAssignModal");
 const slotAssignBackdrop = $("slotAssignBackdrop");
+const slotAssignHeadingEl = $("slotAssignHeading");
 const slotAssignTitleEl = $("slotAssignTitle");
+const slotAssignHelpTextEl = $("slotAssignHelpText");
 const slotAssignRosterEl = $("slotAssignRoster");
 const slotAssignClearBtn = $("slotAssignClearBtn");
 const slotAssignCancelBtn = $("slotAssignCancelBtn");
@@ -262,6 +264,10 @@ let eventFormRenderedType = "";
 let selectedEventId = null;
 let selectedSlotKey = "";
 let slotAssignDraftNames = [];
+let slotAssignMode = "slot";
+let selectedSupplyId = "";
+let selectedSupplyAssignSource = "";
+let supplyAssignDraftName = "";
 let appDialogOnConfirm = null;
 let appDialogOnCancel = null;
 let appDialogOnExtra = null;
@@ -1154,6 +1160,24 @@ function getSupplyAssigneeOptions(selectedName = "") {
   if (current && !seen.has(current.toLowerCase())) unique.unshift(current);
   return unique;
 }
+function getPlayerByName(name) {
+  const target = String(name || "").trim().toLowerCase();
+  if (!target) return null;
+  return state.players.find((player) => String(player?.name || "").trim().toLowerCase() === target) || null;
+}
+function getSupplyAssignButtonHtml(assignedName = "", emptyLabel = "Tap to assign") {
+  const clean = String(assignedName || "").trim();
+  if (!clean) return `<span class="scheduled-supply-assign-placeholder">${escapeHtml(emptyLabel)}</span>`;
+  const player = getPlayerByName(clean);
+  return `<span class="scheduled-supply-assign-pill">${buildPlayerPillMedia(player || { name: clean }, "P")}</span>`;
+}
+function getSupplyAssignButtonClass(baseClass, assignedName = "") {
+  return `player-pill-head ${baseClass}${String(assignedName || "").trim() ? " has-assignee" : " is-empty"}`;
+}
+function findSupplyRowById(root, supplyId, attributeName = "data-supply-id") {
+  if (!root || !supplyId) return null;
+  return Array.from(root.querySelectorAll(`[${attributeName}]`)).find((el) => el.getAttribute(attributeName) === supplyId) || null;
+}
 function getSupplyRowHtml(item = {}, playerOptions = [], rowState = "saved") {
   const safe = {
     id: item?.id || crypto.randomUUID(),
@@ -1162,10 +1186,9 @@ function getSupplyRowHtml(item = {}, playerOptions = [], rowState = "saved") {
     assignedTo: String(item?.assignedTo || "").trim(),
     status: item?.status === "ready" ? "ready" : "needed",
   };
-  const options = [`<option value="">Unassigned</option>`, ...playerOptions.map((name) => `<option value="${escapeHtml(name)}"${safe.assignedTo === name ? " selected" : ""}>${escapeHtml(name)}</option>`)].join("");
   const draft = rowState === "draft";
   const statusLabel = safe.status === "ready" ? "Ready" : "Needed";
-  return `<div class="scheduled-supply-row${draft ? " is-draft" : ""}${safe.status === "ready" ? " is-ready" : ""}" data-supply-row="1" data-row-state="${escapeHtml(rowState)}" data-supply-id="${escapeHtml(safe.id)}"><div class="scheduled-supply-head"><label class="scheduled-supply-toggle-wrap"><input class="scheduled-supply-toggle" type="checkbox"${safe.status === "ready" ? " checked" : ""} /><span class="scheduled-supply-toggle-box" aria-hidden="true"></span><span class="scheduled-supply-kicker">${draft ? "Quick Add" : "Checklist Item"}</span></label><span class="scheduled-supply-pill ${safe.status === "ready" ? "is-ready" : "is-needed"}">${escapeHtml(statusLabel)}</span></div><div class="scheduled-supply-grid"><div class="stack-sm scheduled-supply-field scheduled-supply-field-name"><label class="field-label">Item</label><input class="scheduled-supply-name" type="text" placeholder="Soap buckets" value="${escapeHtml(safe.name)}" /></div><div class="stack-sm scheduled-supply-field scheduled-supply-field-qty"><label class="field-label">Qty</label><input class="scheduled-supply-qty" type="text" placeholder="4" value="${escapeHtml(safe.neededQty)}" /></div><div class="stack-sm scheduled-supply-field scheduled-supply-field-assignee"><label class="field-label">Assigned</label><select class="scheduled-supply-assignee">${options}</select></div><div class="scheduled-supply-actions"><button type="button" class="scheduled-supply-action-btn" data-row-action="${draft ? "add" : "remove"}">${draft ? "Add" : "Remove"}</button></div></div></div>`;
+  return `<div class="scheduled-supply-row${draft ? " is-draft" : ""}${safe.status === "ready" ? " is-ready" : ""}" data-supply-row="1" data-row-state="${escapeHtml(rowState)}" data-supply-id="${escapeHtml(safe.id)}"><div class="scheduled-supply-head"><label class="scheduled-supply-toggle-wrap"><input class="scheduled-supply-toggle" type="checkbox"${safe.status === "ready" ? " checked" : ""} /><span class="scheduled-supply-toggle-box" aria-hidden="true"></span><span class="scheduled-supply-kicker">${draft ? "Quick Add" : "Checklist Item"}</span></label><span class="scheduled-supply-pill ${safe.status === "ready" ? "is-ready" : "is-needed"}">${escapeHtml(statusLabel)}</span></div><div class="scheduled-supply-grid"><div class="stack-sm scheduled-supply-field scheduled-supply-field-name"><label class="field-label">Item</label><input class="scheduled-supply-name" type="text" placeholder="Soap buckets" value="${escapeHtml(safe.name)}" /></div><div class="stack-sm scheduled-supply-field scheduled-supply-field-qty"><label class="field-label">Qty</label><input class="scheduled-supply-qty" type="text" placeholder="4" value="${escapeHtml(safe.neededQty)}" /></div><div class="stack-sm scheduled-supply-field scheduled-supply-field-assignee"><label class="field-label">Assigned</label><button type="button" class="${getSupplyAssignButtonClass("scheduled-supply-assign-btn", safe.assignedTo)}" data-assigned-name="${escapeHtml(safe.assignedTo)}">${getSupplyAssignButtonHtml(safe.assignedTo)}</button></div><div class="scheduled-supply-actions"><button type="button" class="scheduled-supply-action-btn" data-row-action="${draft ? "add" : "remove"}">${draft ? "Add" : "Remove"}</button></div></div></div>`;
 }
 function addSupplyRow(item = {}, rowState = "saved") {
   const list = $("eventSupplyList");
@@ -1196,15 +1219,14 @@ function getSupplyChecklistHtml(items = []) {
   const safe = normalizeSupplyItems(items);
   if (!safe.length) return "";
   return `<div class="scheduled-supply-checklist">${safe.map((item) => {
-    const assigneeOptions = [`<option value="">Unassigned</option>`, ...getSupplyAssigneeOptions(item.assignedTo).map((name) => `<option value="${escapeHtml(name)}"${item.assignedTo === name ? " selected" : ""}>${escapeHtml(name)}</option>`)].join("");
-    return `<div class="scheduled-supply-checklist-row${item.status === "ready" ? " is-ready" : ""}" data-detail-supply-id="${escapeHtml(item.id)}"><label class="scheduled-supply-checklist-main"><input class="scheduled-supply-detail-toggle" type="checkbox"${item.status === "ready" ? " checked" : ""} /><span class="scheduled-supply-toggle-box" aria-hidden="true"></span><span class="scheduled-supply-checklist-copy"><span class="scheduled-supply-checklist-status ${item.status === "ready" ? "is-ready" : "is-needed"}">${item.status === "ready" ? "Ready" : "Needed"}</span><strong>${escapeHtml(item.name || "Unnamed Item")}</strong><span>${escapeHtml(item.neededQty ? `Qty: ${item.neededQty}` : "Qty: -")}</span></span></label><div class="scheduled-supply-checklist-assign"><label class="field-label" for="detailSupplyAssign-${escapeHtml(item.id)}">Assigned</label><select id="detailSupplyAssign-${escapeHtml(item.id)}" class="scheduled-supply-detail-assignee"><option value="">Unassigned</option>${assigneeOptions.replace('<option value="">Unassigned</option>', "")}</select></div></div>`;
+    return `<div class="scheduled-supply-checklist-row${item.status === "ready" ? " is-ready" : ""}" data-detail-supply-id="${escapeHtml(item.id)}"><label class="scheduled-supply-checklist-main"><input class="scheduled-supply-detail-toggle" type="checkbox"${item.status === "ready" ? " checked" : ""} /><span class="scheduled-supply-toggle-box" aria-hidden="true"></span><span class="scheduled-supply-checklist-copy"><span class="scheduled-supply-checklist-status ${item.status === "ready" ? "is-ready" : "is-needed"}">${item.status === "ready" ? "Ready" : "Needed"}</span><strong>${escapeHtml(item.name || "Unnamed Item")}</strong><span>${escapeHtml(item.neededQty ? `Qty: ${item.neededQty}` : "Qty: -")}</span></span></label><div class="scheduled-supply-checklist-assign"><label class="field-label">Assigned</label><button type="button" class="${getSupplyAssignButtonClass("scheduled-supply-detail-assign-btn", item.assignedTo)}" data-assigned-name="${escapeHtml(item.assignedTo)}">${getSupplyAssignButtonHtml(item.assignedTo, "Assign from roster")}</button></div></div>`;
   }).join("")}</div>`;
 }
 function isSupplyRowFilled(row) {
   if (!row) return false;
   const name = row.querySelector(".scheduled-supply-name")?.value.trim() || "";
   const qty = row.querySelector(".scheduled-supply-qty")?.value.trim() || "";
-  const assigned = row.querySelector(".scheduled-supply-assignee")?.value.trim() || "";
+  const assigned = row.querySelector(".scheduled-supply-assign-btn")?.getAttribute("data-assigned-name")?.trim() || "";
   const status = row.querySelector(".scheduled-supply-toggle")?.checked ? "ready" : "needed";
   return !!(name || qty || assigned || status === "ready");
 }
@@ -1551,8 +1573,12 @@ function openEventDetail(open) {
 function openSlotAssign(open) {
   slotAssignModal.classList.toggle("is-hidden", !open);
   if (!open) {
+    slotAssignMode = "slot";
     selectedSlotKey = "";
     slotAssignDraftNames = [];
+    selectedSupplyId = "";
+    selectedSupplyAssignSource = "";
+    supplyAssignDraftName = "";
   }
   syncBodyLock();
 }
@@ -2227,7 +2253,7 @@ function collectTypeDetails(type, existing = {}) {
         id: row.getAttribute("data-supply-id") || crypto.randomUUID(),
         name: row.querySelector(".scheduled-supply-name")?.value.trim() || "",
         neededQty: row.querySelector(".scheduled-supply-qty")?.value.trim() || "",
-        assignedTo: row.querySelector(".scheduled-supply-assignee")?.value.trim() || "",
+        assignedTo: row.querySelector(".scheduled-supply-assign-btn")?.getAttribute("data-assigned-name")?.trim() || "",
         status: row.querySelector(".scheduled-supply-toggle")?.checked ? "ready" : "needed",
       })).filter((item) => item.name || item.neededQty || item.assignedTo || item.status === "ready")
       : [];
@@ -2682,10 +2708,28 @@ function renderCanningScheduleForEvent(e) {
 }
 function renderSlotAssignRoster() {
   const e = getEventById(selectedEventId);
-  if (!e || !selectedSlotKey) { openSlotAssign(false); return; }
-  const assignedNames = Array.isArray(slotAssignDraftNames) ? slotAssignDraftNames.slice() : [];
-  const [date, timeRange] = selectedSlotKey.split("|");
-  slotAssignTitleEl.textContent = `${formatDateLabel(date)} | ${timeRange || ""}`;
+  if (!e) { openSlotAssign(false); return; }
+  const isSupplyMode = slotAssignMode === "supply";
+  if (isSupplyMode && !selectedSupplyId) { openSlotAssign(false); return; }
+  if (!isSupplyMode && !selectedSlotKey) { openSlotAssign(false); return; }
+  const assignedNames = isSupplyMode ? normalizeAssignedNames(supplyAssignDraftName) : (Array.isArray(slotAssignDraftNames) ? slotAssignDraftNames.slice() : []);
+  if (slotAssignHeadingEl) slotAssignHeadingEl.textContent = isSupplyMode ? "Assign Supply" : "Assign Time Block";
+  if (slotAssignHelpTextEl) slotAssignHelpTextEl.textContent = isSupplyMode ? "Choose player" : "Choose player(s)";
+  if (isSupplyMode) {
+    let supplyName = "Supply Item";
+    if (selectedSupplyAssignSource === "detail") {
+      const supply = normalizeSupplyItems(e?.details?.supplies || []).find((item) => item.id === selectedSupplyId);
+      if (supply?.name) supplyName = supply.name;
+    } else {
+      const row = findSupplyRowById(eventTypeDetailsEl, selectedSupplyId);
+      const input = row?.querySelector(".scheduled-supply-name");
+      if (input instanceof HTMLInputElement && input.value.trim()) supplyName = input.value.trim();
+    }
+    slotAssignTitleEl.textContent = supplyName;
+  } else {
+    const [date, timeRange] = selectedSlotKey.split("|");
+    slotAssignTitleEl.textContent = `${formatDateLabel(date)} | ${timeRange || ""}`;
+  }
   slotAssignRosterEl.innerHTML = "";
   const players = state.players.filter((p) => String(p?.name || "").trim());
   if (!players.length) {
@@ -2700,11 +2744,15 @@ function renderSlotAssignRoster() {
     btn.className = `player-pill-head slot-assign-player-btn${assignedNames.includes(name) ? " is-assigned" : ""}`;
     btn.innerHTML = buildPlayerPillMedia(player, "P");
     btn.addEventListener("click", () => {
-      const nextAssigned = Array.isArray(slotAssignDraftNames) ? slotAssignDraftNames.slice() : [];
-      const idx = nextAssigned.indexOf(name);
-      if (idx >= 0) nextAssigned.splice(idx, 1);
-      else nextAssigned.push(name);
-      slotAssignDraftNames = nextAssigned;
+      if (isSupplyMode) {
+        supplyAssignDraftName = assignedNames.includes(name) ? "" : name;
+      } else {
+        const nextAssigned = Array.isArray(slotAssignDraftNames) ? slotAssignDraftNames.slice() : [];
+        const idx = nextAssigned.indexOf(name);
+        if (idx >= 0) nextAssigned.splice(idx, 1);
+        else nextAssigned.push(name);
+        slotAssignDraftNames = nextAssigned;
+      }
       renderSlotAssignRoster();
     });
     slotAssignRosterEl.appendChild(btn);
@@ -3380,6 +3428,19 @@ function wireInputs() {
       updateSupplyRowState(row);
       return;
     }
+    const supplyAssignBtn = raw.closest(".scheduled-supply-assign-btn");
+    if (supplyAssignBtn instanceof HTMLButtonElement) {
+      const row = supplyAssignBtn.closest('[data-supply-row="1"]');
+      const supplyId = row?.getAttribute("data-supply-id") || "";
+      if (!supplyId) return;
+      slotAssignMode = "supply";
+      selectedSupplyId = supplyId;
+      selectedSupplyAssignSource = "form";
+      supplyAssignDraftName = supplyAssignBtn.getAttribute("data-assigned-name") || "";
+      renderSlotAssignRoster();
+      openSlotAssign(true);
+      return;
+    }
     const trigger = raw.closest(".calendar-trigger");
     if (!trigger) return;
     const nativeTarget = trigger.dataset.calendarTarget || "";
@@ -3585,7 +3646,27 @@ function wireInputs() {
   slotAssignCancelBtn.addEventListener("click", () => openSlotAssign(false));
   slotAssignSaveBtn.addEventListener("click", () => {
     const e = getEventById(selectedEventId);
-    if (!e || !selectedSlotKey) { openSlotAssign(false); return; }
+    if (!e) { openSlotAssign(false); return; }
+    if (slotAssignMode === "supply") {
+      const assignedName = String(supplyAssignDraftName || "").trim();
+      if (selectedSupplyAssignSource === "detail") {
+        if (selectedSupplyId && updateSelectedEventSupply(selectedSupplyId, { assignedTo: assignedName })) {
+          renderEventDetail();
+          saveState();
+        }
+      } else {
+        const row = findSupplyRowById(eventTypeDetailsEl, selectedSupplyId);
+        const button = row?.querySelector(".scheduled-supply-assign-btn");
+        if (button instanceof HTMLButtonElement) {
+          button.setAttribute("data-assigned-name", assignedName);
+          button.className = getSupplyAssignButtonClass("scheduled-supply-assign-btn", assignedName);
+          button.innerHTML = getSupplyAssignButtonHtml(assignedName);
+        }
+      }
+      openSlotAssign(false);
+      return;
+    }
+    if (!selectedSlotKey) { openSlotAssign(false); return; }
     if (!e.details || typeof e.details !== "object") e.details = {};
     if (!e.details.assignments || typeof e.details.assignments !== "object") e.details.assignments = {};
     if (slotAssignDraftNames.length) e.details.assignments[selectedSlotKey] = slotAssignDraftNames.slice();
@@ -3596,8 +3677,13 @@ function wireInputs() {
   });
   slotAssignBackdrop.addEventListener("click", () => {});
   slotAssignClearBtn.addEventListener("click", () => {
-    if (!selectedSlotKey) return;
-    slotAssignDraftNames = [];
+    if (slotAssignMode === "supply") {
+      if (!selectedSupplyId) return;
+      supplyAssignDraftName = "";
+    } else {
+      if (!selectedSlotKey) return;
+      slotAssignDraftNames = [];
+    }
     renderSlotAssignRoster();
   });
   eventDetailScheduleGrid.addEventListener("click", (evt) => {
@@ -3817,20 +3903,23 @@ function wireInputs() {
       }
       return;
     }
-    const assignee = raw.closest(".scheduled-supply-detail-assignee");
-    if (assignee instanceof HTMLSelectElement) {
-      const row = assignee.closest("[data-detail-supply-id]");
-      const supplyId = row?.getAttribute("data-detail-supply-id") || "";
-      if (!supplyId) return;
-      if (updateSelectedEventSupply(supplyId, { assignedTo: assignee.value.trim() })) {
-        renderEventDetail();
-        saveState();
-      }
-    }
   });
   eventDetailNotesEl?.addEventListener("click", (evt) => {
     const raw = evt.target;
     if (!(raw instanceof HTMLElement)) return;
+    const supplyAssignBtn = raw.closest(".scheduled-supply-detail-assign-btn");
+    if (supplyAssignBtn instanceof HTMLButtonElement) {
+      const row = supplyAssignBtn.closest("[data-detail-supply-id]");
+      const supplyId = row?.getAttribute("data-detail-supply-id") || "";
+      if (!supplyId) return;
+      slotAssignMode = "supply";
+      selectedSupplyId = supplyId;
+      selectedSupplyAssignSource = "detail";
+      supplyAssignDraftName = supplyAssignBtn.getAttribute("data-assigned-name") || "";
+      renderSlotAssignRoster();
+      openSlotAssign(true);
+      return;
+    }
     const previewBtn = raw.closest("[data-merch-preview-src]");
     if (!(previewBtn instanceof HTMLButtonElement)) return;
     const src = previewBtn.getAttribute("data-merch-preview-src") || "";

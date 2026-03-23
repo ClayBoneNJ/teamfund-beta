@@ -418,6 +418,61 @@ body.modal-open {
   padding: 9px 12px;
 }
 
+.scheduled-supply-assign-btn,
+.scheduled-supply-detail-assign-btn {
+  min-height: 42px;
+  justify-content: flex-start;
+  text-align: left;
+  box-shadow: none;
+}
+
+.scheduled-supply-assign-btn.is-empty,
+.scheduled-supply-detail-assign-btn.is-empty {
+  background: rgba(8, 12, 30, 0.72);
+  border-color: rgba(var(--team1-rgb), 0.42);
+  text-shadow: none;
+}
+
+.scheduled-supply-assign-btn.has-assignee,
+.scheduled-supply-detail-assign-btn.has-assignee {
+  padding: 6px 8px;
+  background: rgba(9, 14, 33, 0.78);
+  border-color: rgba(var(--team-accent-rgb), 0.42);
+}
+
+.scheduled-supply-assign-placeholder {
+  color: #c4d0ff;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.scheduled-supply-assign-pill {
+  display: block;
+  width: 100%;
+}
+
+.scheduled-supply-assign-btn .player-name-number,
+.scheduled-supply-detail-assign-btn .player-name-number {
+  display: none;
+}
+
+.scheduled-supply-assign-btn .player-avatar,
+.scheduled-supply-detail-assign-btn .player-avatar {
+  width: 34px;
+  height: 34px;
+  font-size: 0.62rem;
+}
+
+.scheduled-supply-assign-btn .player-pill-copy,
+.scheduled-supply-detail-assign-btn .player-pill-copy {
+  gap: 2px;
+}
+
+.scheduled-supply-assign-btn .player-pill-copy strong,
+.scheduled-supply-detail-assign-btn .player-pill-copy strong {
+  font-size: 0.82rem;
+}
+
 .scheduled-supply-actions {
   display: flex;
   justify-content: flex-end;
@@ -669,8 +724,8 @@ body.modal-open {
   gap: 5px;
 }
 
-.scheduled-supply-checklist-assign select {
-  min-height: 40px;
+.scheduled-supply-detail-assign-btn {
+  width: 100%;
 }
 
 .gap-lg {
