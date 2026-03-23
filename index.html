@@ -104,63 +104,92 @@
       </div>
 
       <form id="teamForm" class="stack-md">
-        <div class="stack-sm">
-          <label class="field-label" for="teamName">Team Name</label>
-          <input id="teamName" type="text" placeholder="12U Wildcats" />
-        </div>
-        <div class="stack-sm">
-          <label class="field-label" for="teamDivision">League / Division</label>
-          <input id="teamDivision" type="text" placeholder="Cal Ripken Majors or 12U AA" />
-        </div>
-        <div class="stack-sm">
-          <label class="field-label" for="teamHometown">Hometown</label>
-          <input id="teamHometown" type="text" placeholder="Sayreville, NJ" />
-        </div>
-        <div class="stack-sm">
-          <span class="field-label">Team Admins</span>
-          <div class="admin-toolbar">
-            <button type="button" id="openAdminBtn">Add Admin</button>
-            <span id="adminCountText" class="file-name">No admins added yet</span>
+        <section class="form-section">
+          <div class="form-section-head">
+            <p class="form-section-kicker">Step 1</p>
+            <h3>Basic Team Details</h3>
+            <p>Fill in the core info supporters will recognize first.</p>
           </div>
-          <ul id="adminEditorList" class="admin-editor-list"></ul>
-        </div>
+          <div class="stack-md">
+            <div class="stack-sm">
+              <label class="field-label" for="teamName">Team Name</label>
+              <input id="teamName" type="text" placeholder="12U Wildcats" />
+            </div>
+            <div class="stack-sm">
+              <label class="field-label" for="teamDivision">League / Division</label>
+              <input id="teamDivision" type="text" placeholder="Cal Ripken Majors or 12U AA" />
+            </div>
+            <div class="stack-sm">
+              <label class="field-label" for="teamHometown">Hometown</label>
+              <input id="teamHometown" type="text" placeholder="Sayreville, NJ" />
+            </div>
+          </div>
+        </section>
 
-        <div class="split">
+        <section class="form-section">
+          <div class="form-section-head">
+            <p class="form-section-kicker">Step 2</p>
+            <h3>Team Admins</h3>
+            <p>Add the people who will manage fundraising updates and contact info.</p>
+          </div>
           <div class="stack-sm">
-            <label class="field-label" for="teamColor1">Main Color 1</label>
-            <input id="teamColor1" type="color" value="#17335f" />
+            <div class="admin-toolbar">
+              <button type="button" id="openAdminBtn">Add Admin</button>
+              <span id="adminCountText" class="file-name">No admins added yet</span>
+            </div>
+            <ul id="adminEditorList" class="admin-editor-list"></ul>
           </div>
-          <div class="stack-sm">
-            <label class="field-label" for="teamColor2">Main Color 2</label>
-            <input id="teamColor2" type="color" value="#224a85" />
-          </div>
-        </div>
+        </section>
 
-        <div class="stack-sm">
-          <label class="field-label" for="teamAccentColor">Accent Color</label>
-          <input id="teamAccentColor" type="color" value="#9bb4d8" />
-        </div>
-
-        <div class="stack-sm">
-          <span class="field-label">Team Logo</span>
-          <div class="logo-upload">
-            <label for="teamLogo" class="file-trigger">Add Logo</label>
-            <button type="button" id="cropTeamLogoBtn">Crop Logo</button>
-            <span class="file-name" id="logoFileName">No file selected</span>
-            <input id="teamLogo" type="file" accept="image/*" />
+        <section class="form-section">
+          <div class="form-section-head">
+            <p class="form-section-kicker">Step 3</p>
+            <h3>Branding</h3>
+            <p>Choose your team colors and logo so the page feels finished.</p>
           </div>
-          <div id="teamLogoPreviewWrap" class="team-logo-preview is-hidden">
-            <img id="teamLogoPreviewImg" alt="Team logo preview" />
-          </div>
-        </div>
+          <div class="stack-md">
+            <div class="split">
+              <div class="stack-sm">
+                <label class="field-label" for="teamColor1">Main Color 1</label>
+                <input id="teamColor1" type="color" value="#17335f" />
+              </div>
+              <div class="stack-sm">
+                <label class="field-label" for="teamColor2">Main Color 2</label>
+                <input id="teamColor2" type="color" value="#224a85" />
+              </div>
+            </div>
 
-        <div class="stack-sm">
-          <span class="field-label">Payment QR Codes</span>
+            <div class="stack-sm">
+              <label class="field-label" for="teamAccentColor">Accent Color</label>
+              <input id="teamAccentColor" type="color" value="#9bb4d8" />
+            </div>
+
+            <div class="stack-sm">
+              <span class="field-label">Team Logo</span>
+              <div class="logo-upload">
+                <label for="teamLogo" class="file-trigger">Add Logo</label>
+                <button type="button" id="cropTeamLogoBtn">Crop Logo</button>
+                <span class="file-name" id="logoFileName">No file selected</span>
+                <input id="teamLogo" type="file" accept="image/*" />
+              </div>
+              <div id="teamLogoPreviewWrap" class="team-logo-preview is-hidden">
+                <img id="teamLogoPreviewImg" alt="Team logo preview" />
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="form-section">
+          <div class="form-section-head">
+            <p class="form-section-kicker">Step 4</p>
+            <h3>Payment QR Codes</h3>
+            <p>Optional, but helpful if you want quick mobile payments ready to scan.</p>
+          </div>
           <div class="split">
             <button type="button" id="editTeamVenmoQrBtn">Add Venmo QR</button>
             <button type="button" id="editTeamZelleQrBtn">Add Zelle QR</button>
           </div>
-        </div>
+        </section>
 
         <div class="inline-form team-form-actions">
           <button type="submit" id="saveTeamBtn" class="primary-save-btn">Save Team Info</button>
