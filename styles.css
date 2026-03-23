@@ -682,6 +682,21 @@ textarea {
   font-weight: 500;
 }
 
+select {
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  padding-right: 42px;
+  background-image:
+    linear-gradient(45deg, transparent 50%, #cdd8ff 50%),
+    linear-gradient(135deg, #cdd8ff 50%, transparent 50%);
+  background-position:
+    calc(100% - 18px) calc(50% - 3px),
+    calc(100% - 12px) calc(50% - 3px);
+  background-size: 6px 6px, 6px 6px;
+  background-repeat: no-repeat;
+}
+
 input::placeholder {
   color: #7f8aba;
 }
@@ -1935,6 +1950,30 @@ button:disabled,
   background: rgba(7, 11, 28, 0.55);
 }
 
+.dropdown-toggle-btn {
+  position: relative;
+  padding-right: 42px;
+  text-align: left;
+}
+
+.dropdown-toggle-btn::after {
+  content: "";
+  position: absolute;
+  right: 16px;
+  top: 50%;
+  width: 9px;
+  height: 9px;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: translateY(-65%) rotate(45deg);
+  transition: transform 140ms ease;
+  pointer-events: none;
+}
+
+.dropdown-toggle-btn[aria-expanded="true"]::after {
+  transform: translateY(-30%) rotate(-135deg);
+}
+
 .admin-linked-player-list {
   display: grid;
   gap: 8px;
@@ -2549,5 +2588,10 @@ button:disabled,
 
   .app-header {
     padding-right: 110px;
+  }
+
+  select,
+  .dropdown-toggle-btn {
+    min-height: 46px;
   }
 }

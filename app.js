@@ -1690,11 +1690,13 @@ function renderAdminLinkedPlayerOptions(selectedIds = []) {
   if (!state.players.length) {
     toggleAdminLinksBtn.textContent = "No players on roster";
     toggleAdminLinksBtn.disabled = true;
+    toggleAdminLinksBtn.setAttribute("aria-expanded", "false");
     adminLinkedPlayersSummaryEl.textContent = "Add players to the roster to link them here.";
     adminLinkedPlayersWrapEl.classList.add("is-hidden");
     return;
   }
   toggleAdminLinksBtn.disabled = false;
+  toggleAdminLinksBtn.setAttribute("aria-expanded", adminLinkedPlayersWrapEl.classList.contains("is-hidden") ? "false" : "true");
   toggleAdminLinksBtn.textContent = adminLinkedPlayersWrapEl.classList.contains("is-hidden") ? "Link to Player(s)" : "Hide Linked Player(s)";
   const linkedNames = getLinkedPlayerNames([...selected]);
   adminLinkedPlayersSummaryEl.textContent = linkedNames.length ? linkedNames.join(", ") : "No linked players selected.";
@@ -3053,6 +3055,7 @@ function wireInputs() {
     if (!state.players.length) return;
     const opening = adminLinkedPlayersWrapEl.classList.contains("is-hidden");
     adminLinkedPlayersWrapEl.classList.toggle("is-hidden", !opening);
+    toggleAdminLinksBtn.setAttribute("aria-expanded", opening ? "true" : "false");
     const selectedIds = getSelectedAdminLinkedPlayerIds();
     renderAdminLinkedPlayerOptions(selectedIds);
   });
