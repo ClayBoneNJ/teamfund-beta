@@ -736,11 +736,11 @@ select {
 }
 
 input::placeholder {
-  color: rgba(237, 242, 255, 0.1);
+  color: rgba(148, 156, 178, 0.38);
 }
 
 #eventTitle::placeholder {
-  color: rgba(237, 242, 255, 0.1);
+  color: rgba(148, 156, 178, 0.38);
   font-weight: 400;
 }
 
@@ -751,7 +751,7 @@ input[type="time"]::-webkit-calendar-picker-indicator {
 }
 
 textarea::placeholder {
-  color: rgba(237, 242, 255, 0.1);
+  color: rgba(148, 156, 178, 0.38);
 }
 
 input[type="color"] {
