@@ -118,6 +118,7 @@ const playerNameEl = $("playerName");
 const playerNumberEl = $("playerNumber");
 const contactNameEl = $("contactName");
 const contactPhoneEl = $("contactPhone");
+const contactEmailEl = $("contactEmail");
 const playerPhotoEl = $("playerPhoto");
 const cropPlayerPhotoBtn = $("cropPlayerPhotoBtn");
 const playerPhotoFileNameEl = $("playerPhotoFileName");
@@ -137,6 +138,7 @@ const detailPlayerName = $("detailPlayerName");
 const detailPlayerNumber = $("detailPlayerNumber");
 const detailContactName = $("detailContactName");
 const detailContactPhone = $("detailContactPhone");
+const detailContactEmail = $("detailContactEmail");
 const editPlayerFromDetailBtn = $("editPlayerFromDetailBtn");
 const adminDetailModal = $("adminDetailModal");
 const detailAdminPhoto = $("detailAdminPhoto");
@@ -212,6 +214,7 @@ const appDialogCancelBtn = $("appDialogCancelBtn");
 const eventTypeEl = $("eventType");
 const eventTitleEl = $("eventTitle");
 const eventLeadNameEl = $("eventLeadName");
+const eventLeadNameOptionsEl = $("eventLeadNameOptions");
 const eventLeadPhoneEl = $("eventLeadPhone");
 const eventLeadEmailEl = $("eventLeadEmail");
 const eventFlyersEl = $("eventFlyers");
@@ -328,6 +331,18 @@ function mapLinkHtml(query, label = "") {
   if (!clean) return safeLabel;
   return `<a class="map-link" href="${mapSearchHref(clean)}" target="_blank" rel="noopener noreferrer">${safeLabel}</a>`;
 }
+function getSafeExternalUrl(value) {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+  if (/^https?:\/\//i.test(raw)) return raw;
+  return `https://${raw}`;
+}
+function externalLinkHtml(url, label = "") {
+  const href = getSafeExternalUrl(url);
+  const safeLabel = escapeHtml(label || url);
+  if (!href) return safeLabel;
+  return `<a class="map-link" href="${escapeHtml(href)}" target="_blank" rel="noopener noreferrer">${safeLabel}</a>`;
+}
 function isAddressLike(text) {
   const v = String(text || "").trim();
   if (!v) return false;
@@ -402,6 +417,7 @@ function normalizePlayerRecord(player) {
     number: String(player?.number || "").trim(),
     contactName: String(player?.contactName || "").trim(),
     contactPhone: formatPhone(player?.contactPhone || ""),
+    contactEmail: String(player?.contactEmail || "").trim(),
     photoDataUrl,
     photoSourceDataUrl: normalizeImageSource(player?.photoSourceDataUrl, photoDataUrl),
   };
@@ -428,6 +444,7 @@ function buildPlayerPillLabel(player) {
   const parts = [];
   const name = String(player?.name || "").trim();
   if (name) parts.push(`<strong>${escapeHtml(name)}</strong>`);
+  else parts.push("<strong>Unnamed Player</strong>");
   if (player?.contactName) parts.push(`<span class="player-contact-pill">${escapeHtml(player.contactName)}</span>`);
   return `<span class="player-pill-copy">${parts.join("")}</span>`;
 }
@@ -436,10 +453,10 @@ function buildPlayerPillMedia(player, fallbackInitial = "P") {
   const name = String(player?.name || "").trim() || "Unnamed Player";
   const initials = getInitials(name, fallbackInitial);
   const avatar = player?.photoDataUrl ? `<img src="${player.photoDataUrl}" alt="${escapeHtml(name)} photo" />` : `<span>${escapeHtml(initials)}</span>`;
-  return `${number ? `<span class="player-pill-number">#${escapeHtml(number)}</span>` : ""}<span class="player-avatar">${avatar}</span>${buildPlayerPillLabel({ ...player, name })}`;
+  return `${number ? `<span class="player-name-number">${escapeHtml(number)}</span>` : ""}<span class="player-avatar">${avatar}</span>${buildPlayerPillLabel({ ...player, name })}`;
 }
 function renderEventLeadContactOptions(selectedName = "") {
-  if (!eventLeadNameEl) return;
+  if (!eventLeadNameEl || !eventLeadNameOptionsEl) return;
   const currentValue = String(selectedName || eventLeadNameEl.value || "").trim();
   const contacts = [];
   const seen = new Set();
@@ -459,17 +476,14 @@ function renderEventLeadContactOptions(selectedName = "") {
   if (currentValue && !seen.has(currentValue.toLowerCase())) {
     contacts.unshift({ name: currentValue, label: `${currentValue} | Current` });
   }
-  eventLeadNameEl.innerHTML = "";
-  const placeholder = document.createElement("option");
-  placeholder.value = "";
-  placeholder.textContent = contacts.length ? "Select roster contact" : "No roster contacts yet";
-  eventLeadNameEl.appendChild(placeholder);
+  eventLeadNameOptionsEl.innerHTML = "";
   contacts.forEach((contact) => {
     const option = document.createElement("option");
     option.value = contact.name;
-    option.textContent = contact.label;
-    eventLeadNameEl.appendChild(option);
+    option.label = contact.label;
+    eventLeadNameOptionsEl.appendChild(option);
   });
+  eventLeadNameEl.placeholder = contacts.length ? "Select or type a contact" : "Type a custom contact";
   eventLeadNameEl.value = currentValue;
 }
 function syncEventLeadFromRosterContact() {
@@ -977,6 +991,10 @@ function isScheduledShiftEvent(type) {
   const normalized = normalizeType(type);
   return normalized === "canning" || normalized === "car_wash";
 }
+function usesManualRaisedTotal(type) {
+  const normalized = normalizeType(type);
+  return normalized === "restaurant_night" || normalized === "merch" || normalized === "other";
+}
 function getScheduledEventConfig(type) {
   if (normalizeType(type) === "car_wash") {
     return {
@@ -1008,6 +1026,134 @@ function normalizeSupplyItems(items = []) {
     status: item?.status === "ready" ? "ready" : "needed",
   })).filter((item) => item.name || item.neededQty || item.assignedTo || item.status === "ready") : [];
 }
+function getMerchStatusLabel(status = "") {
+  return ({
+    collecting_orders: "Collecting Orders",
+    order_submitted: "Order Submitted",
+    items_arrived: "Items Arrived",
+    ready_for_pickup: "Ready for Pickup",
+    completed: "Completed",
+  }[String(status || "").trim()] || "Collecting Orders");
+}
+function normalizeMerchItems(items = []) {
+  return Array.isArray(items) ? items.map((item) => ({
+    id: item?.id || crypto.randomUUID(),
+    name: String(item?.name || "").trim(),
+    price: String(item?.price || "").trim(),
+    mockDataUrl: String(item?.mockDataUrl || "").trim(),
+    mockName: String(item?.mockName || "").trim(),
+  })).filter((item) => item.name || item.price || item.mockDataUrl) : [];
+}
+function getMerchItemRowHtml(item = {}, rowState = "saved") {
+  const safe = {
+    id: item?.id || crypto.randomUUID(),
+    name: String(item?.name || "").trim(),
+    price: String(item?.price || "").trim(),
+    mockDataUrl: String(item?.mockDataUrl || "").trim(),
+    mockName: String(item?.mockName || "").trim(),
+  };
+  const draft = rowState === "draft";
+  const previewHtml = safe.mockDataUrl ? `<div class="merch-item-mock-preview"><img src="${safe.mockDataUrl}" alt="${escapeHtml(safe.mockName || safe.name || "Mock preview")}" /><button type="button" class="merch-item-mock-remove" aria-label="Remove mock">Remove Mock</button></div>` : `<div class="merch-item-mock-empty">No mock yet</div>`;
+  return `<div class="merch-item-row${draft ? " is-draft" : ""}" data-merch-item-row="1" data-row-state="${escapeHtml(rowState)}" data-merch-item-id="${escapeHtml(safe.id)}" data-merch-mock-data-url="${escapeHtml(safe.mockDataUrl)}" data-merch-mock-name="${escapeHtml(safe.mockName)}"><div class="merch-item-main"><input class="merch-item-name" type="text" placeholder="Hoodie" value="${escapeHtml(safe.name)}" /><input class="merch-item-price" type="text" inputmode="decimal" placeholder="$25.00" value="${escapeHtml(formatMoneyTypingValue(safe.price || "", true))}" /><button type="button" class="merch-item-mock-btn">${safe.mockDataUrl ? "Replace Mock" : "Add Mock"}</button><button type="button" class="merch-item-action-btn" data-row-action="${draft ? "add" : "remove"}">${draft ? "Add" : "Remove"}</button></div><div class="merch-item-mock-wrap">${previewHtml}</div></div>`;
+}
+function addMerchItemRow(item = {}, rowState = "saved") {
+  const list = $("merchItemList");
+  if (!list) return null;
+  const wrap = document.createElement("div");
+  wrap.innerHTML = getMerchItemRowHtml(item, rowState);
+  const row = wrap.firstElementChild;
+  if (!(row instanceof HTMLElement)) return null;
+  list.appendChild(row);
+  const priceInput = row.querySelector(".merch-item-price");
+  if (priceInput instanceof HTMLInputElement) applyLiveMoneyFormatting(priceInput);
+  return row;
+}
+function ensureDraftMerchItemRow() {
+  const list = $("merchItemList");
+  if (!list) return;
+  let draftRow = list.querySelector('[data-merch-item-row="1"][data-row-state="draft"]');
+  if (!draftRow) draftRow = addMerchItemRow({}, "draft");
+  if (draftRow && list.firstElementChild !== draftRow) list.prepend(draftRow);
+}
+function renderMerchItemRows(items = []) {
+  const list = $("merchItemList");
+  if (!list) return;
+  list.innerHTML = "";
+  normalizeMerchItems(items).forEach((item) => addMerchItemRow(item, "saved"));
+  ensureDraftMerchItemRow();
+}
+function isMerchItemRowFilled(row) {
+  if (!row) return false;
+  const name = row.querySelector(".merch-item-name")?.value.trim() || "";
+  const price = row.querySelector(".merch-item-price")?.value.trim() || "";
+  const mockDataUrl = row.getAttribute("data-merch-mock-data-url") || "";
+  return !!(name || price || mockDataUrl);
+}
+function updateMerchItemMockPreview(row) {
+  if (!row) return;
+  const wrap = row.querySelector(".merch-item-mock-wrap");
+  const btn = row.querySelector(".merch-item-mock-btn");
+  if (!(wrap instanceof HTMLElement) || !(btn instanceof HTMLButtonElement)) return;
+  const mockDataUrl = row.getAttribute("data-merch-mock-data-url") || "";
+  const mockName = row.getAttribute("data-merch-mock-name") || "";
+  const itemName = row.querySelector(".merch-item-name")?.value.trim() || "Mock preview";
+  if (mockDataUrl) {
+    wrap.innerHTML = `<div class="merch-item-mock-preview"><img src="${mockDataUrl}" alt="${escapeHtml(mockName || itemName)}" /><button type="button" class="merch-item-mock-remove" aria-label="Remove mock">Remove Mock</button></div>`;
+    btn.textContent = "Replace Mock";
+  } else {
+    wrap.innerHTML = `<div class="merch-item-mock-empty">No mock yet</div>`;
+    btn.textContent = "Add Mock";
+  }
+}
+async function chooseMerchItemMock(row) {
+  if (!row) return;
+  const input = document.createElement("input");
+  input.type = "file";
+  input.accept = "image/*";
+  input.addEventListener("change", async () => {
+    const file = input.files?.[0];
+    if (!file) return;
+    const dataUrl = await readPlayerPhotoData(file);
+    row.setAttribute("data-merch-mock-data-url", dataUrl);
+    row.setAttribute("data-merch-mock-name", file.name || "");
+    updateMerchItemMockPreview(row);
+  });
+  input.click();
+}
+function formatMerchSaleWindow(details = {}) {
+  const start = String(details.saleStart || "").trim();
+  const end = String(details.saleEnd || details.deadline || "").trim();
+  if (start && end) return `${formatDateLabel(start)} - ${formatDateLabel(end)}`;
+  if (start) return `Starts ${formatDateLabel(start)}`;
+  if (end) return `Ends ${formatDateLabel(end)}`;
+  return "Sale window TBD";
+}
+function getMerchDetailHtml(details = {}) {
+  const description = String(details.description || details.orderInfo || "").trim();
+  const fulfillmentNotes = String(details.fulfillmentNotes || "").trim();
+  const items = normalizeMerchItems(details.items || []);
+  const orderLine = details.orderLink
+    ? externalLinkHtml(details.orderLink, "Open Order Link")
+    : escapeHtml(details.contactMethod || "No order link or contact method added yet");
+  return `<div class="merch-detail-stack">${description ? `<div class="merch-detail-section"><p class="field-label">Campaign</p><p>${escapeHtml(description)}</p></div>` : ""}${items.length ? `<div class="merch-detail-section"><p class="field-label">Items</p><div class="merch-detail-items">${items.map((item) => `<div class="merch-detail-item">${item.mockDataUrl ? `<button type="button" class="merch-detail-item-mock" data-merch-preview-src="${escapeHtml(item.mockDataUrl)}" data-merch-preview-title="${escapeHtml(item.mockName || item.name || "Mock preview")}"><img src="${item.mockDataUrl}" alt="${escapeHtml(item.mockName || item.name || "Mock preview")}" /><span class="merch-detail-item-mock-label">Preview</span></button>` : ""}<div class="merch-detail-item-copy"><strong>${escapeHtml(item.name || "Unnamed Item")}</strong><span>${escapeHtml(item.price ? formatMoney(parseMoneyInput(item.price) || 0) : "Price TBD")}</span></div></div>`).join("")}</div></div>` : ""}<div class="merch-detail-section"><p class="field-label">How To Order</p><p>${orderLine}</p></div>${fulfillmentNotes ? `<div class="merch-detail-section"><p class="field-label">Fulfillment Notes</p><p>${escapeHtml(fulfillmentNotes)}</p></div>` : ""}</div>`;
+}
+function getSupplyAssigneeOptions(selectedName = "") {
+  const names = state.players
+    .map((player) => String(player?.name || "").trim())
+    .filter(Boolean)
+    .sort((a, b) => a.localeCompare(b));
+  const unique = [];
+  const seen = new Set();
+  names.forEach((name) => {
+    const key = name.toLowerCase();
+    if (seen.has(key)) return;
+    seen.add(key);
+    unique.push(name);
+  });
+  const current = String(selectedName || "").trim();
+  if (current && !seen.has(current.toLowerCase())) unique.unshift(current);
+  return unique;
+}
 function getSupplyRowHtml(item = {}, playerOptions = [], rowState = "saved") {
   const safe = {
     id: item?.id || crypto.randomUUID(),
@@ -1019,12 +1165,12 @@ function getSupplyRowHtml(item = {}, playerOptions = [], rowState = "saved") {
   const options = [`<option value="">Unassigned</option>`, ...playerOptions.map((name) => `<option value="${escapeHtml(name)}"${safe.assignedTo === name ? " selected" : ""}>${escapeHtml(name)}</option>`)].join("");
   const draft = rowState === "draft";
   const statusLabel = safe.status === "ready" ? "Ready" : "Needed";
-  return `<div class="scheduled-supply-row${draft ? " is-draft" : ""}" data-supply-row="1" data-row-state="${escapeHtml(rowState)}" data-supply-id="${escapeHtml(safe.id)}"><div class="scheduled-supply-head"><div class="scheduled-supply-head-copy"><span class="scheduled-supply-kicker">${draft ? "New Supply" : "Supply Item"}</span><strong>${escapeHtml(safe.name || "Add a checklist item")}</strong></div><span class="scheduled-supply-pill ${safe.status === "ready" ? "is-ready" : "is-needed"}">${escapeHtml(statusLabel)}</span></div><div class="scheduled-supply-grid"><div class="stack-sm scheduled-supply-field"><label class="field-label">Item</label><input class="scheduled-supply-name" type="text" placeholder="Soap buckets" value="${escapeHtml(safe.name)}" /></div><div class="stack-sm scheduled-supply-field"><label class="field-label">Qty Needed</label><input class="scheduled-supply-qty" type="text" placeholder="4" value="${escapeHtml(safe.neededQty)}" /></div><div class="stack-sm scheduled-supply-field"><label class="field-label">Assigned To</label><select class="scheduled-supply-assignee">${options}</select></div><div class="stack-sm scheduled-supply-field"><label class="field-label">Status</label><select class="scheduled-supply-status"><option value="needed"${safe.status === "needed" ? " selected" : ""}>Needed</option><option value="ready"${safe.status === "ready" ? " selected" : ""}>Ready</option></select></div></div><div class="scheduled-supply-footer"><button type="button" class="scheduled-supply-action-btn" data-row-action="${draft ? "add" : "remove"}">${draft ? "Add Supply" : "Remove Item"}</button></div></div>`;
+  return `<div class="scheduled-supply-row${draft ? " is-draft" : ""}${safe.status === "ready" ? " is-ready" : ""}" data-supply-row="1" data-row-state="${escapeHtml(rowState)}" data-supply-id="${escapeHtml(safe.id)}"><div class="scheduled-supply-head"><label class="scheduled-supply-toggle-wrap"><input class="scheduled-supply-toggle" type="checkbox"${safe.status === "ready" ? " checked" : ""} /><span class="scheduled-supply-toggle-box" aria-hidden="true"></span><span class="scheduled-supply-kicker">${draft ? "Quick Add" : "Checklist Item"}</span></label><span class="scheduled-supply-pill ${safe.status === "ready" ? "is-ready" : "is-needed"}">${escapeHtml(statusLabel)}</span></div><div class="scheduled-supply-grid"><div class="stack-sm scheduled-supply-field scheduled-supply-field-name"><label class="field-label">Item</label><input class="scheduled-supply-name" type="text" placeholder="Soap buckets" value="${escapeHtml(safe.name)}" /></div><div class="stack-sm scheduled-supply-field scheduled-supply-field-qty"><label class="field-label">Qty</label><input class="scheduled-supply-qty" type="text" placeholder="4" value="${escapeHtml(safe.neededQty)}" /></div><div class="stack-sm scheduled-supply-field scheduled-supply-field-assignee"><label class="field-label">Assigned</label><select class="scheduled-supply-assignee">${options}</select></div><div class="scheduled-supply-actions"><button type="button" class="scheduled-supply-action-btn" data-row-action="${draft ? "add" : "remove"}">${draft ? "Add" : "Remove"}</button></div></div></div>`;
 }
 function addSupplyRow(item = {}, rowState = "saved") {
   const list = $("eventSupplyList");
   if (!list) return null;
-  const playerOptions = state.players.map((player) => String(player?.name || "").trim()).filter(Boolean).sort((a, b) => a.localeCompare(b));
+  const playerOptions = getSupplyAssigneeOptions(item?.assignedTo || "");
   const wrap = document.createElement("div");
   wrap.innerHTML = getSupplyRowHtml(item, playerOptions, rowState);
   const row = wrap.firstElementChild;
@@ -1049,15 +1195,50 @@ function renderSupplyRows(items = []) {
 function getSupplyChecklistHtml(items = []) {
   const safe = normalizeSupplyItems(items);
   if (!safe.length) return "";
-  return `<div class="scheduled-supply-checklist">${safe.map((item) => `<div class="scheduled-supply-checklist-row"><span class="scheduled-supply-checklist-status ${item.status === "ready" ? "is-ready" : "is-needed"}">${item.status === "ready" ? "Ready" : "Needed"}</span><strong>${escapeHtml(item.name || "Unnamed Item")}</strong><span>${escapeHtml(item.neededQty ? `Qty: ${item.neededQty}` : "Qty: -")}</span><span>${escapeHtml(item.assignedTo ? `Assigned: ${item.assignedTo}` : "Assigned: Unassigned")}</span></div>`).join("")}</div>`;
+  return `<div class="scheduled-supply-checklist">${safe.map((item) => {
+    const assigneeOptions = [`<option value="">Unassigned</option>`, ...getSupplyAssigneeOptions(item.assignedTo).map((name) => `<option value="${escapeHtml(name)}"${item.assignedTo === name ? " selected" : ""}>${escapeHtml(name)}</option>`)].join("");
+    return `<div class="scheduled-supply-checklist-row${item.status === "ready" ? " is-ready" : ""}" data-detail-supply-id="${escapeHtml(item.id)}"><label class="scheduled-supply-checklist-main"><input class="scheduled-supply-detail-toggle" type="checkbox"${item.status === "ready" ? " checked" : ""} /><span class="scheduled-supply-toggle-box" aria-hidden="true"></span><span class="scheduled-supply-checklist-copy"><span class="scheduled-supply-checklist-status ${item.status === "ready" ? "is-ready" : "is-needed"}">${item.status === "ready" ? "Ready" : "Needed"}</span><strong>${escapeHtml(item.name || "Unnamed Item")}</strong><span>${escapeHtml(item.neededQty ? `Qty: ${item.neededQty}` : "Qty: -")}</span></span></label><div class="scheduled-supply-checklist-assign"><label class="field-label" for="detailSupplyAssign-${escapeHtml(item.id)}">Assigned</label><select id="detailSupplyAssign-${escapeHtml(item.id)}" class="scheduled-supply-detail-assignee"><option value="">Unassigned</option>${assigneeOptions.replace('<option value="">Unassigned</option>', "")}</select></div></div>`;
+  }).join("")}</div>`;
 }
 function isSupplyRowFilled(row) {
   if (!row) return false;
   const name = row.querySelector(".scheduled-supply-name")?.value.trim() || "";
   const qty = row.querySelector(".scheduled-supply-qty")?.value.trim() || "";
   const assigned = row.querySelector(".scheduled-supply-assignee")?.value.trim() || "";
-  const status = row.querySelector(".scheduled-supply-status")?.value || "needed";
+  const status = row.querySelector(".scheduled-supply-toggle")?.checked ? "ready" : "needed";
   return !!(name || qty || assigned || status === "ready");
+}
+function updateSupplyRowState(row) {
+  if (!row) return;
+  const ready = !!row.querySelector(".scheduled-supply-toggle")?.checked;
+  row.classList.toggle("is-ready", ready);
+  const pill = row.querySelector(".scheduled-supply-pill");
+  if (pill) {
+    pill.textContent = ready ? "Ready" : "Needed";
+    pill.classList.toggle("is-ready", ready);
+    pill.classList.toggle("is-needed", !ready);
+  }
+}
+function updateSelectedEventSupply(supplyId, updates = {}) {
+  const event = getEventById(selectedEventId);
+  if (!event || normalizeType(event.type) !== "car_wash") return false;
+  if (!event.details || typeof event.details !== "object") event.details = {};
+  const supplies = normalizeSupplyItems(event.details.supplies || []);
+  const idx = supplies.findIndex((item) => item.id === supplyId);
+  if (idx === -1) return false;
+  supplies[idx] = { ...supplies[idx], ...updates };
+  event.details.supplies = normalizeSupplyItems(supplies);
+  return true;
+}
+function updateSelectedEventMerch(updates = {}) {
+  const event = getEventById(selectedEventId);
+  if (!event || normalizeType(event.type) !== "merch") return false;
+  if (!event.details || typeof event.details !== "object") event.details = {};
+  event.details = {
+    ...event.details,
+    ...updates,
+  };
+  return true;
 }
 function syncCanningRaisedForEvent(event) {
   if (!event || !isScheduledShiftEvent(event.type)) return false;
@@ -1694,6 +1875,7 @@ function fillPlayerForm(index) {
   playerNumberEl.value = p.number || "";
   contactNameEl.value = p.contactName || "";
   contactPhoneEl.value = p.contactPhone || "";
+  contactEmailEl.value = p.contactEmail || "";
   playerPhotoEl.value = "";
   playerPhotoFileNameEl.textContent = p.photoDataUrl ? "Current photo on file" : "No file selected";
   pendingPlayerPhotoDataUrl = "";
@@ -1711,6 +1893,7 @@ function openPlayerDetailForIndex(index, anchorEl) {
   detailPlayerNumber.textContent = p.number ? `#${p.number}` : "-";
   detailContactName.textContent = p.contactName || "-";
   detailContactPhone.textContent = formatPhone(p.contactPhone || "");
+  detailContactEmail.textContent = p.contactEmail || "-";
   openPlayerDetail(true);
   if (anchorEl) positionPlayerDetail();
 }
@@ -2002,7 +2185,7 @@ function renderEventTypeDetails(type, details = {}) {
   }
   if (type === "raffle") {
     const pricing = getRaffleTicketPricing(details);
-    eventTypeDetailsEl.innerHTML = `<div class="raffle-ticket-pricing-grid"><div class="stack-sm"><label class="field-label" for="rafflePriceOne">1 for</label><input id="rafflePriceOne" type="text" inputmode="decimal" placeholder="$0.00" value="${escapeHtml(formatMoneyTypingValue(pricing.one || "", true))}" /></div><div class="stack-sm"><label class="field-label" for="rafflePriceFive">5 for</label><input id="rafflePriceFive" type="text" inputmode="decimal" placeholder="$0.00" value="${escapeHtml(formatMoneyTypingValue(pricing.five || "", true))}" /></div><div class="stack-sm"><label class="field-label" for="rafflePriceTen">10 for</label><input id="rafflePriceTen" type="text" inputmode="decimal" placeholder="$0.00" value="${escapeHtml(formatMoneyTypingValue(pricing.ten || "", true))}" /></div><div class="stack-sm"><label class="field-label" for="rafflePriceCustom">X for each</label><input id="rafflePriceCustom" type="text" inputmode="decimal" placeholder="$0.00" value="${escapeHtml(formatMoneyTypingValue(pricing.custom || "", true))}" /></div></div><div class="stack-sm"><label class="field-label">Prizes</label><div id="rafflePrizeList" class="stack-sm"></div></div><div class="stack-sm"><label class="field-label" for="raffleDrawingDate">Drawing Date</label><div class="calendar-input-wrap single"><input id="raffleDrawingDate" type="datetime-local" value="${escapeHtml(details.drawingDate || "")}" /><button type="button" class="calendar-trigger" data-calendar-target="raffleDrawingDate" aria-label="Open date picker" title="Open calendar"><span aria-hidden="true">&#128197;</span></button></div></div>`;
+    eventTypeDetailsEl.innerHTML = `<div class="raffle-ticket-pricing-grid"><div class="stack-sm"><label class="field-label" for="rafflePriceOne">1 ticket for</label><input id="rafflePriceOne" type="text" inputmode="decimal" placeholder="$0.00" value="${escapeHtml(formatMoneyTypingValue(pricing.one || "", true))}" /></div><div class="stack-sm"><label class="field-label" for="rafflePriceFive">5 tickets for</label><input id="rafflePriceFive" type="text" inputmode="decimal" placeholder="$0.00" value="${escapeHtml(formatMoneyTypingValue(pricing.five || "", true))}" /></div><div class="stack-sm"><label class="field-label" for="rafflePriceTen">10 tickets for</label><input id="rafflePriceTen" type="text" inputmode="decimal" placeholder="$0.00" value="${escapeHtml(formatMoneyTypingValue(pricing.ten || "", true))}" /></div><div class="stack-sm"><label class="field-label" for="rafflePriceCustom">X tickets for</label><input id="rafflePriceCustom" type="text" inputmode="decimal" placeholder="$0.00" value="${escapeHtml(formatMoneyTypingValue(pricing.custom || "", true))}" /></div></div><div class="stack-sm"><label class="field-label">Prizes</label><div id="rafflePrizeList" class="stack-sm"></div></div><div class="stack-sm"><label class="field-label" for="raffleDrawingDate">Drawing Date</label><div class="calendar-input-wrap single"><input id="raffleDrawingDate" type="datetime-local" value="${escapeHtml(details.drawingDate || "")}" /><button type="button" class="calendar-trigger" data-calendar-target="raffleDrawingDate" aria-label="Open date picker" title="Open calendar"><span aria-hidden="true">&#128197;</span></button></div></div>`;
     ["rafflePriceOne", "rafflePriceFive", "rafflePriceTen", "rafflePriceCustom"].forEach((id) => applyLiveMoneyFormatting($(id)));
     renderRafflePrizeRows(details.prizes || []);
     return;
@@ -2012,7 +2195,12 @@ function renderEventTypeDetails(type, details = {}) {
     return;
   }
   if (type === "merch") {
-    eventTypeDetailsEl.innerHTML = `<div class="stack-sm"><label class="field-label" for="merchOrderInfo">Order Info</label><textarea id="merchOrderInfo" rows="3" placeholder="Items, sizes, prices, pickup">${escapeHtml(details.orderInfo || "")}</textarea></div><div class="split"><div class="stack-sm"><label class="field-label" for="merchOrderLink">Order Link</label><input id="merchOrderLink" type="url" placeholder="https://..." value="${escapeHtml(details.orderLink || "")}" /></div><div class="stack-sm"><label class="field-label" for="merchDeadline">Order Deadline</label><div class="calendar-input-wrap single"><input id="merchDeadline" type="date" value="${escapeHtml(details.deadline || "")}" /><button type="button" class="calendar-trigger" data-calendar-target="merchDeadline" aria-label="Open date picker" title="Open calendar"><span aria-hidden="true">&#128197;</span></button></div></div></div>`;
+    const status = String(details.status || "collecting_orders").trim() || "collecting_orders";
+    const unitsSold = Math.max(0, Number(details.unitsSold) || 0);
+    const saleStart = details.saleStart || "";
+    const saleEnd = details.saleEnd || details.deadline || "";
+    eventTypeDetailsEl.innerHTML = `<div class="split"><div class="stack-sm"><label class="field-label" for="merchSaleStart">Sale Start</label><div class="calendar-input-wrap single"><input id="merchSaleStart" type="date" value="${escapeHtml(saleStart)}" /><button type="button" class="calendar-trigger" data-calendar-target="merchSaleStart" aria-label="Open date picker" title="Open calendar"><span aria-hidden="true">&#128197;</span></button></div></div><div class="stack-sm"><label class="field-label" for="merchSaleEnd">Sale End</label><div class="calendar-input-wrap single"><input id="merchSaleEnd" type="date" value="${escapeHtml(saleEnd)}" /><button type="button" class="calendar-trigger" data-calendar-target="merchSaleEnd" aria-label="Open date picker" title="Open calendar"><span aria-hidden="true">&#128197;</span></button></div></div></div><div class="split"><div class="stack-sm"><label class="field-label" for="merchOrderLink">Order Link</label><input id="merchOrderLink" type="url" placeholder="https://..." value="${escapeHtml(details.orderLink || "")}" /></div><div class="stack-sm"><label class="field-label" for="merchContactMethod">Contact Method</label><input id="merchContactMethod" type="text" placeholder="Text coach or DM team account" value="${escapeHtml(details.contactMethod || "")}" /></div></div><div class="split"><div class="stack-sm"><label class="field-label" for="merchStatus">Campaign Status</label><select id="merchStatus"><option value="collecting_orders"${status === "collecting_orders" ? " selected" : ""}>Collecting Orders</option><option value="order_submitted"${status === "order_submitted" ? " selected" : ""}>Order Submitted</option><option value="items_arrived"${status === "items_arrived" ? " selected" : ""}>Items Arrived</option><option value="ready_for_pickup"${status === "ready_for_pickup" ? " selected" : ""}>Ready for Pickup</option><option value="completed"${status === "completed" ? " selected" : ""}>Completed</option></select></div><div class="stack-sm"><label class="field-label" for="merchUnitsSold">Total Units Sold</label><input id="merchUnitsSold" type="number" min="0" step="1" value="${escapeHtml(String(unitsSold))}" /></div></div><div class="stack-sm"><label class="field-label" for="merchDescription">Campaign Description</label><textarea id="merchDescription" rows="3" placeholder="What you are selling, pickup plan, key dates">${escapeHtml(details.description || details.orderInfo || "")}</textarea></div><div class="stack-sm"><label class="field-label">Items</label><div id="merchItemList" class="stack-sm"></div></div><div class="stack-sm"><label class="field-label" for="merchFulfillmentNotes">Fulfillment Notes</label><textarea id="merchFulfillmentNotes" rows="3" placeholder="Bulk order submitted Friday, pickup at practice next week">${escapeHtml(details.fulfillmentNotes || "")}</textarea></div>`;
+    renderMerchItemRows(details.items || []);
     return;
   }
   eventTypeDetailsEl.innerHTML = `<div class="stack-sm"><label class="field-label" for="otherEventDetails">Event Details</label><textarea id="otherEventDetails" rows="3" placeholder="Custom details">${escapeHtml(details.notes || "")}</textarea></div>`;
@@ -2038,7 +2226,7 @@ function collectTypeDetails(type, existing = {}) {
         name: row.querySelector(".scheduled-supply-name")?.value.trim() || "",
         neededQty: row.querySelector(".scheduled-supply-qty")?.value.trim() || "",
         assignedTo: row.querySelector(".scheduled-supply-assignee")?.value.trim() || "",
-        status: row.querySelector(".scheduled-supply-status")?.value === "ready" ? "ready" : "needed",
+        status: row.querySelector(".scheduled-supply-toggle")?.checked ? "ready" : "needed",
       })).filter((item) => item.name || item.neededQty || item.assignedTo || item.status === "ready")
       : [];
     return {
@@ -2077,7 +2265,30 @@ function collectTypeDetails(type, existing = {}) {
     };
   }
   if (type === "restaurant_night") return { dateTime: $("restaurantDate")?.value || "", location: $("restaurantLocation")?.value.trim() || "", details: $("restaurantDetails")?.value.trim() || "" };
-  if (type === "merch") return { orderInfo: $("merchOrderInfo")?.value.trim() || "", orderLink: $("merchOrderLink")?.value.trim() || "", deadline: $("merchDeadline")?.value || "" };
+  if (type === "merch") {
+    const items = Array.from(eventTypeDetailsEl.querySelectorAll('[data-merch-item-row="1"][data-row-state="saved"]')).map((row) => ({
+      id: row.getAttribute("data-merch-item-id") || crypto.randomUUID(),
+      name: row.querySelector(".merch-item-name")?.value.trim() || "",
+      price: String(parseMoneyInput(row.querySelector(".merch-item-price")?.value || "") || "").trim(),
+      mockDataUrl: row.getAttribute("data-merch-mock-data-url") || "",
+      mockName: row.getAttribute("data-merch-mock-name") || "",
+    })).filter((item) => item.name || item.price || item.mockDataUrl);
+    const description = $("merchDescription")?.value.trim() || "";
+    const saleEnd = $("merchSaleEnd")?.value || "";
+    return {
+      saleStart: $("merchSaleStart")?.value || "",
+      saleEnd,
+      deadline: saleEnd,
+      orderLink: $("merchOrderLink")?.value.trim() || "",
+      contactMethod: $("merchContactMethod")?.value.trim() || "",
+      status: $("merchStatus")?.value || "collecting_orders",
+      unitsSold: Math.max(0, Number($("merchUnitsSold")?.value) || 0),
+      description,
+      orderInfo: description,
+      fulfillmentNotes: $("merchFulfillmentNotes")?.value.trim() || "",
+      items,
+    };
+  }
   return { notes: $("otherEventDetails")?.value.trim() || "" };
 }
 function validateScheduledEventDetails(details, type = "canning") {
@@ -2112,7 +2323,7 @@ function eventSummary(e) {
     return `${formatRafflePrizesText(d.prizes)} | Draw: ${d.drawingDate || "TBD"}`;
   }
   if (t === "restaurant_night") return `${d.location || "Location TBD"} | ${d.dateTime || "Date TBD"}`;
-  if (t === "merch") return d.orderInfo || "Order info TBD";
+  if (t === "merch") return `${getMerchStatusLabel(d.status)} | ${formatMerchSaleWindow(d)}`;
   return d.notes || "Details TBD";
 }
 function getEventMetaItems(e) {
@@ -2138,6 +2349,19 @@ function getEventMetaItems(e) {
       { label: "Time", value: timePart, isHtml: false },
     ];
   }
+  if (t === "merch") {
+    const orderValue = d.orderLink
+      ? externalLinkHtml(d.orderLink, "Order Link")
+      : (d.contactMethod || "Contact method TBD");
+    const status = String(d.status || "collecting_orders").trim() || "collecting_orders";
+    const statusControl = `<select class="event-meta-status-select" aria-label="Campaign Status"><option value="collecting_orders"${status === "collecting_orders" ? " selected" : ""}>Collecting Orders</option><option value="order_submitted"${status === "order_submitted" ? " selected" : ""}>Order Submitted</option><option value="items_arrived"${status === "items_arrived" ? " selected" : ""}>Items Arrived</option><option value="ready_for_pickup"${status === "ready_for_pickup" ? " selected" : ""}>Ready for Pickup</option><option value="completed"${status === "completed" ? " selected" : ""}>Completed</option></select>`;
+    return [
+      { label: "Sale Window", value: formatMerchSaleWindow(d), isHtml: false },
+      { label: "Status", value: statusControl, isHtml: true, className: "is-status-chip" },
+      { label: "Units Sold", value: `${Math.max(0, Number(d.unitsSold) || 0)} units`, isHtml: false },
+      { label: "Order", value: orderValue, isHtml: !!d.orderLink },
+    ];
+  }
   return [];
 }
 function eventMetaBoxHtml(e, className = "") {
@@ -2145,7 +2369,7 @@ function eventMetaBoxHtml(e, className = "") {
   if (!items.length) return "";
   const classes = ["event-meta-box"];
   if (className) classes.push(className);
-  return `<div class="${classes.join(" ")}">${items.map((item) => `<div class="event-meta-chip"><span class="event-meta-label">${escapeHtml(item.label)}</span><span class="event-meta-value">${item.isHtml ? item.value : escapeHtml(item.value)}</span></div>`).join("")}</div>`;
+  return `<div class="${classes.join(" ")}">${items.map((item) => `<div class="event-meta-chip${item.className ? ` ${escapeHtml(item.className)}` : ""}"><span class="event-meta-label">${escapeHtml(item.label)}</span><span class="event-meta-value">${item.isHtml ? item.value : escapeHtml(item.value)}</span></div>`).join("")}</div>`;
 }
 function eventSummaryHtml(e) {
   const d = e?.details || {};
@@ -2154,6 +2378,9 @@ function eventSummaryHtml(e) {
     return eventMetaBoxHtml(e);
   }
   if (t === "restaurant_night") {
+    return eventMetaBoxHtml(e);
+  }
+  if (t === "merch") {
     return eventMetaBoxHtml(e);
   }
   if (t === "raffle") {
@@ -2507,6 +2734,8 @@ function renderEventDetail() {
     const notesHtml = linkifyAddressLines(detailNotes);
     const suppliesHtml = getSupplyChecklistHtml(e.details?.supplies);
     eventDetailNotesEl.innerHTML = suppliesHtml ? `${notesHtml}<div class="detail-supplies-wrap"><p class="field-label">Supplies</p>${suppliesHtml}</div>` : notesHtml;
+  } else if (normalizeType(e.type) === "merch") {
+    eventDetailNotesEl.innerHTML = getMerchDetailHtml(e.details || {});
   } else {
     eventDetailNotesEl.innerHTML = linkifyAddressLines(detailNotes);
   }
@@ -2526,7 +2755,7 @@ function renderEventDetail() {
   renderCanningScheduleForEvent(e);
   eventDetailEditBtn.classList.toggle("is-hidden", false);
   eventDetailEditBtn.textContent = live ? "Edit Event" : "Delete Event";
-  eventDetailUpdateRaisedBtn.classList.add("is-hidden");
+  eventDetailUpdateRaisedBtn.classList.toggle("is-hidden", !live || !usesManualRaisedTotal(e.type));
   eventDetailAddFlyerBtn.classList.add("is-hidden");
 }
 function renderEvents() {
@@ -2536,12 +2765,30 @@ function renderEvents() {
     const live = e.isLive !== false;
     const li = document.createElement("li");
     li.className = "event-item";
-    li.innerHTML = `<button type="button" class="event-pill-head"><div class="event-row-top"><strong>${escapeHtml(e.title)}</strong><span class="event-status ${live ? "status-live" : "status-ended"}">${live ? "Live" : "Ended"}</span></div><div class="event-pill-meta">${typeLabel(e.type)} | ${formatMoney(e.raisedSoFar || 0)} | Lead: ${escapeHtml(e.lead?.name || "N/A")}</div></button>`;
-    li.querySelector(".event-pill-head").addEventListener("click", () => {
+    const primaryFlyer = Array.isArray(e.flyers) ? e.flyers.find((flyer) => getFlyerHref(flyer)) : null;
+    const flyerHref = primaryFlyer ? getFlyerHref(primaryFlyer) : "";
+    const flyerMime = primaryFlyer?.type || "application/octet-stream";
+    const flyerName = primaryFlyer?.name || `${e.title || "Event"} flyer`;
+    li.innerHTML = `<div class="event-pill-shell${flyerHref ? " has-flyer" : ""}">${flyerHref ? `<button type="button" class="event-pill-flyer-btn" aria-label="Preview flyer for ${escapeHtml(e.title || "event")}"><div class="event-pill-flyer"><div class="event-pill-flyer-placeholder">${isPdfLike(flyerMime, flyerHref) ? "PDF" : "Preview"}</div>${isPdfLike(flyerMime, flyerHref) ? '<span class="event-pill-flyer-badge">PDF</span>' : ""}</div></button>` : ""}<button type="button" class="event-pill-head"><div class="event-pill-copy"><div class="event-row-top"><strong>${escapeHtml(e.title)}</strong><span class="event-status ${live ? "status-live" : "status-ended"}">${live ? "Live" : "Ended"}</span></div><div class="event-pill-meta">${typeLabel(e.type)} | ${formatMoney(e.raisedSoFar || 0)} | Lead: ${escapeHtml(e.lead?.name || "N/A")}</div></div></button></div>`;
+    const pillBtn = li.querySelector(".event-pill-head");
+    pillBtn?.addEventListener("click", () => {
       selectedEventId = e.id;
       renderEventDetail();
       openEventDetail(true);
     });
+    if (flyerHref && pillBtn instanceof HTMLButtonElement) {
+      const flyerBtn = li.querySelector(".event-pill-flyer-btn");
+      flyerBtn?.addEventListener("click", (evt) => {
+        evt.stopPropagation();
+        openFlyerPreview(true, flyerHref, flyerName, flyerMime);
+      });
+      resolveFlyerPreviewImageSrc(flyerHref, flyerMime).then((imageSrc) => {
+        if (!imageSrc || !pillBtn.isConnected) return;
+        const flyerEl = li.querySelector(".event-pill-flyer");
+        if (!(flyerEl instanceof HTMLElement)) return;
+        flyerEl.innerHTML = `${isPdfLike(flyerMime, flyerHref) ? '<span class="event-pill-flyer-badge">PDF</span>' : ""}<img src="${imageSrc}" alt="${escapeHtml(flyerName)} preview" />`;
+      }).catch(() => {});
+    }
     eventList.appendChild(li);
   });
   updateEventListScrollState();
@@ -2883,6 +3130,7 @@ function wireInputs() {
     const number = playerNumberEl.value.trim();
     const contactName = contactNameEl.value.trim();
     const contactPhone = contactPhoneEl.value.trim();
+    const contactEmail = contactEmailEl.value.trim();
     if (!name || !contactName || !contactPhone) return;
     if (!hasValidPhone(contactPhone)) {
       openAppDialog({ title: "Contact Phone", message: "Enter a 10-digit phone number.", confirmLabel: "OK", showCancel: false });
@@ -2894,7 +3142,7 @@ function wireInputs() {
       photoDataUrl = await readPlayerPhotoData(playerPhotoEl.files[0]);
       photoSourceDataUrl = photoDataUrl;
     }
-    const payload = { id: editingPlayerIndex === null ? crypto.randomUUID() : state.players[editingPlayerIndex]?.id || crypto.randomUUID(), name, number, contactName, contactPhone: formatPhone(contactPhone), photoDataUrl, photoSourceDataUrl };
+    const payload = { id: editingPlayerIndex === null ? crypto.randomUUID() : state.players[editingPlayerIndex]?.id || crypto.randomUUID(), name, number, contactName, contactPhone: formatPhone(contactPhone), contactEmail, photoDataUrl, photoSourceDataUrl };
     if (editingPlayerIndex === null) state.players.push(normalizePlayerRecord(payload));
     else state.players[editingPlayerIndex] = normalizePlayerRecord({ ...state.players[editingPlayerIndex], ...payload, photoDataUrl: payload.photoDataUrl || state.players[editingPlayerIndex].photoDataUrl || "", photoSourceDataUrl: payload.photoSourceDataUrl || state.players[editingPlayerIndex].photoSourceDataUrl || state.players[editingPlayerIndex].photoDataUrl || "" });
     editingPlayerIndex = null;
@@ -3086,6 +3334,49 @@ function wireInputs() {
       }
       return;
     }
+    const merchItemActionBtn = raw.closest(".merch-item-action-btn");
+    if (merchItemActionBtn) {
+      const action = merchItemActionBtn.getAttribute("data-row-action") || "remove";
+      const row = merchItemActionBtn.closest('[data-merch-item-row="1"]');
+      if (!row) return;
+      if (action === "add") {
+        if (!isMerchItemRowFilled(row)) return;
+        row.setAttribute("data-row-state", "saved");
+        merchItemActionBtn.textContent = "Remove";
+        merchItemActionBtn.setAttribute("data-row-action", "remove");
+        ensureDraftMerchItemRow();
+        const draftName = eventTypeDetailsEl.querySelector('[data-merch-item-row="1"][data-row-state="draft"] .merch-item-name');
+        if (draftName instanceof HTMLInputElement) draftName.focus();
+      } else {
+        row.remove();
+        ensureDraftMerchItemRow();
+      }
+      return;
+    }
+    const merchMockBtn = raw.closest(".merch-item-mock-btn");
+    if (merchMockBtn) {
+      const row = merchMockBtn.closest('[data-merch-item-row="1"]');
+      if (row instanceof HTMLElement) {
+        chooseMerchItemMock(row).catch(() => {});
+      }
+      return;
+    }
+    const merchMockRemoveBtn = raw.closest(".merch-item-mock-remove");
+    if (merchMockRemoveBtn) {
+      const row = merchMockRemoveBtn.closest('[data-merch-item-row="1"]');
+      if (row instanceof HTMLElement) {
+        row.setAttribute("data-merch-mock-data-url", "");
+        row.setAttribute("data-merch-mock-name", "");
+        updateMerchItemMockPreview(row);
+      }
+      return;
+    }
+    const supplyToggle = raw.closest(".scheduled-supply-toggle");
+    if (supplyToggle) {
+      const row = supplyToggle.closest('[data-supply-row="1"]');
+      updateSupplyRowState(row);
+      return;
+    }
     const trigger = raw.closest(".calendar-trigger");
     if (!trigger) return;
     const nativeTarget = trigger.dataset.calendarTarget || "";
@@ -3112,6 +3403,13 @@ function wireInputs() {
     const end = $("canningEndTime");
     if (!end) return;
     end.value = addHoursToTime(t.value, 2) || "";
+  });
+  eventTypeDetailsEl.addEventListener("change", (e) => {
+    const t = e.target;
+    if (!(t instanceof HTMLInputElement)) return;
+    if (!t.classList.contains("scheduled-supply-toggle")) return;
+    const row = t.closest('[data-supply-row="1"]');
+    updateSupplyRowState(row);
   });
   calendarPrevBtn.addEventListener("click", () => {
     calendarView.month -= 1;
@@ -3488,6 +3786,54 @@ function wireInputs() {
     positionCalendarPopover();
     updateRosterListScrollState();
     updateEventListScrollState();
+  });
+  eventDetailSummaryEl?.addEventListener("change", (evt) => {
+    const raw = evt.target;
+    if (!(raw instanceof HTMLElement)) return;
+    const merchStatus = raw.closest(".event-meta-status-select");
+    if (merchStatus instanceof HTMLSelectElement) {
+      if (updateSelectedEventMerch({ status: merchStatus.value || "collecting_orders" })) {
+        renderEventDetail();
+        renderEvents();
+        saveState();
+      }
+      return;
+    }
+  });
+  eventDetailNotesEl?.addEventListener("change", (evt) => {
+    const raw = evt.target;
+    if (!(raw instanceof HTMLElement)) return;
+    const toggle = raw.closest(".scheduled-supply-detail-toggle");
+    if (toggle instanceof HTMLInputElement) {
+      const row = toggle.closest("[data-detail-supply-id]");
+      const supplyId = row?.getAttribute("data-detail-supply-id") || "";
+      if (!supplyId) return;
+      if (updateSelectedEventSupply(supplyId, { status: toggle.checked ? "ready" : "needed" })) {
+        renderEventDetail();
+        saveState();
+      }
+      return;
+    }
+    const assignee = raw.closest(".scheduled-supply-detail-assignee");
+    if (assignee instanceof HTMLSelectElement) {
+      const row = assignee.closest("[data-detail-supply-id]");
+      const supplyId = row?.getAttribute("data-detail-supply-id") || "";
+      if (!supplyId) return;
+      if (updateSelectedEventSupply(supplyId, { assignedTo: assignee.value.trim() })) {
+        renderEventDetail();
+        saveState();
+      }
+    }
+  });
+  eventDetailNotesEl?.addEventListener("click", (evt) => {
+    const raw = evt.target;
+    if (!(raw instanceof HTMLElement)) return;
+    const previewBtn = raw.closest("[data-merch-preview-src]");
+    if (!(previewBtn instanceof HTMLButtonElement)) return;
+    const src = previewBtn.getAttribute("data-merch-preview-src") || "";
+    const title = previewBtn.getAttribute("data-merch-preview-title") || "Mock Preview";
+    if (!src) return;
+    openFlyerPreview(true, src, title, "image/*");
   });
   document.addEventListener("click", (e) => {
     if (!calendarPopover.classList.contains("is-hidden")) {

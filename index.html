@@ -286,6 +286,10 @@
           <input id="contactPhone" type="tel" placeholder="(555) 123-4567" required />
         </div>
         <div class="stack-sm">
+          <label class="field-label" for="contactEmail">Contact Email</label>
+          <input id="contactEmail" type="email" placeholder="optional@email.com" />
+        </div>
+        <div class="stack-sm">
           <span class="field-label">Player Photo</span>
           <div class="logo-upload">
             <label for="playerPhoto" class="file-trigger">Add Photo</label>
@@ -335,9 +339,8 @@
           <div class="lead-contact-grid">
             <div class="stack-sm">
               <label class="field-label" for="eventLeadName">Name</label>
-              <select id="eventLeadName" required>
-                <option value="">Select roster contact</option>
-              </select>
+              <input id="eventLeadName" type="text" list="eventLeadNameOptions" placeholder="Select or type a contact" required />
+              <datalist id="eventLeadNameOptions"></datalist>
             </div>
             <div class="stack-sm">
               <label class="field-label" for="eventLeadPhone">Phone</label>
@@ -392,7 +395,7 @@
         </div>
         <div>
           <p class="meta-label">Notes</p>
-          <p id="eventDetailNotes">-</p>
+          <div id="eventDetailNotes">-</div>
         </div>
         <div>
           <p class="meta-label">Flyer</p>
@@ -553,6 +556,10 @@
         <div>
           <p class="meta-label">Phone</p>
           <p class="meta-value" id="detailContactPhone">-</p>
+        </div>
+        <div>
+          <p class="meta-label">Email</p>
+          <p class="meta-value" id="detailContactEmail">-</p>
         </div>
         <div class="inline-form">
           <button type="button" id="editPlayerFromDetailBtn">Edit Player</button>

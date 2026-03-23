@@ -247,14 +247,18 @@ body.modal-open {
 
 .scheduled-supply-row {
   display: grid;
-  gap: 9px;
+  gap: 8px;
   border: 1px solid rgba(var(--team1-rgb), 0.32);
   border-radius: 12px;
-  padding: 9px 10px;
+  padding: 8px 9px;
   background:
     linear-gradient(180deg, rgba(34, 20, 76, 0.24), rgba(9, 14, 33, 0.74)),
     rgba(9, 14, 33, 0.55);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+}
+
+.scheduled-supply-row.is-ready {
+  border-color: rgba(83, 212, 165, 0.42);
 }
 
 .scheduled-supply-row.is-draft {
@@ -272,37 +276,73 @@ body.modal-open {
   gap: 10px;
 }
 
-.scheduled-supply-head-copy {
+.scheduled-supply-toggle-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
   min-width: 0;
-  display: grid;
-  gap: 2px;
+  cursor: pointer;
 }
 
-.scheduled-supply-head-copy strong {
-  font-size: 0.84rem;
-  font-weight: 700;
-  color: #e8eeff;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+.scheduled-supply-toggle,
+.scheduled-supply-detail-toggle {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.scheduled-supply-toggle-box {
+  width: 18px;
+  height: 18px;
+  border-radius: 6px;
+  border: 1px solid rgba(var(--team-accent-rgb), 0.58);
+  background: rgba(6, 10, 25, 0.78);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  flex: 0 0 auto;
+}
+
+.scheduled-supply-toggle-box::after {
+  content: "";
+  width: 8px;
+  height: 4px;
+  border-left: 2px solid transparent;
+  border-bottom: 2px solid transparent;
+  transform: rotate(-45deg) translate(1px, -1px);
+  opacity: 0;
+}
+
+.scheduled-supply-toggle:checked + .scheduled-supply-toggle-box,
+.scheduled-supply-detail-toggle:checked + .scheduled-supply-toggle-box {
+  background: linear-gradient(180deg, rgba(83, 212, 165, 0.32), rgba(24, 88, 71, 0.92));
+  border-color: rgba(115, 235, 194, 0.88);
+}
+
+.scheduled-supply-toggle:checked + .scheduled-supply-toggle-box::after,
+.scheduled-supply-detail-toggle:checked + .scheduled-supply-toggle-box::after {
+  border-left-color: #d8fff1;
+  border-bottom-color: #d8fff1;
+  opacity: 1;
 }
 
 .scheduled-supply-kicker {
-  font-size: 0.65rem;
+  font-size: 0.63rem;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.07em;
-  color: #8a9cf0;
+  letter-spacing: 0.08em;
+  color: #93a6f6;
 }
 
 .scheduled-supply-pill {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 64px;
-  padding: 3px 8px;
+  min-width: 58px;
+  padding: 3px 7px;
   border-radius: 999px;
-  font-size: 0.68rem;
+  font-size: 0.64rem;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.04em;
@@ -320,37 +360,203 @@ body.modal-open {
 
 .scheduled-supply-grid {
   display: grid;
-  grid-template-columns: 1.35fr 0.8fr 1fr 0.9fr;
+  grid-template-columns: minmax(0, 1.65fr) 90px minmax(0, 1fr) auto;
   gap: 8px;
+  align-items: end;
 }
 
 .scheduled-supply-field {
-  padding: 7px 8px;
-  border: 1px solid rgba(var(--team1-rgb), 0.24);
-  border-radius: 10px;
-  background: rgba(7, 11, 29, 0.5);
+  min-width: 0;
 }
 
 .scheduled-supply-field .field-label {
-  font-size: 0.72rem;
+  font-size: 0.68rem;
   letter-spacing: 0.03em;
 }
 
-.scheduled-supply-footer {
+.scheduled-supply-field input,
+.scheduled-supply-field select {
+  min-height: 42px;
+  padding: 9px 12px;
+}
+
+.scheduled-supply-actions {
   display: flex;
   justify-content: flex-end;
+  align-items: end;
 }
 
 .scheduled-supply-action-btn {
-  min-width: 110px;
-  min-height: 40px;
-  padding-inline: 14px;
-  font-size: 0.94rem;
+  min-width: 84px;
+  min-height: 42px;
+  padding-inline: 12px;
+  font-size: 0.88rem;
   box-shadow: 0 8px 18px rgba(var(--team-accent-rgb), 0.12);
+}
+
+.merch-item-row {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+  align-items: stretch;
+  padding: 8px;
+  border: 1px solid rgba(var(--team-accent-rgb), 0.44);
+  border-radius: 12px;
+  background: linear-gradient(140deg, rgba(10, 15, 36, 0.82), rgba(12, 20, 46, 0.6));
+}
+
+.merch-item-main {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) 120px auto auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.merch-item-row.is-draft {
+  border-style: dashed;
+}
+
+.merch-item-mock-btn,
+.merch-item-action-btn {
+  padding: 8px 10px;
+  border-radius: 10px;
+  font-size: 0.76rem;
+}
+
+.merch-item-mock-wrap {
+  min-height: 72px;
+}
+
+.merch-item-mock-empty {
+  min-height: 72px;
+  display: grid;
+  place-items: center;
+  border: 1px dashed rgba(var(--team-accent-rgb), 0.34);
+  border-radius: 10px;
+  color: #aebae7;
+  font-size: 0.78rem;
+  background: rgba(9, 14, 33, 0.34);
+}
+
+.merch-item-mock-preview {
+  position: relative;
+  width: 88px;
+  height: 88px;
+}
+
+.merch-item-mock-preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 10px;
+  border: 1px solid rgba(var(--team1-rgb), 0.35);
+  display: block;
+}
+
+.merch-item-mock-remove {
+  position: absolute;
+  right: 6px;
+  bottom: 6px;
+  padding: 4px 6px;
+  border-radius: 8px;
+  font-size: 0.64rem;
 }
 
 .detail-supplies-wrap {
   margin-top: 14px;
+}
+
+.merch-detail-stack {
+  display: grid;
+  gap: 12px;
+}
+
+.merch-detail-section {
+  display: grid;
+  gap: 6px;
+}
+
+.merch-detail-section p {
+  margin: 0;
+}
+
+.merch-detail-items {
+  display: grid;
+  gap: 8px;
+}
+
+.merch-detail-item {
+  display: flex;
+  justify-content: flex-start;
+  gap: 10px;
+  align-items: center;
+  padding: 10px 12px;
+  border: 1px solid rgba(var(--team1-rgb), 0.3);
+  border-radius: 10px;
+  background: rgba(9, 14, 33, 0.48);
+}
+
+.merch-detail-item-mock {
+  position: relative;
+  width: 64px;
+  height: 64px;
+  flex: 0 0 64px;
+  padding: 0;
+  border: 0;
+  border-radius: 10px;
+  overflow: hidden;
+  cursor: pointer;
+  background: transparent;
+}
+
+.merch-detail-item-mock img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 10px;
+  display: block;
+}
+
+.merch-detail-item-mock-label {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 4px 6px;
+  background: linear-gradient(180deg, transparent, rgba(4, 8, 20, 0.9));
+  color: #edf3ff;
+  font-size: 0.64rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.merch-detail-item-mock:hover img,
+.merch-detail-item-mock:focus-visible img {
+  transform: scale(1.03);
+}
+
+.merch-detail-item-mock img {
+  transition: transform 160ms ease;
+}
+
+.merch-detail-item-mock:focus-visible {
+  outline: 2px solid rgba(var(--team-accent-rgb), 0.85);
+  outline-offset: 2px;
+}
+
+.merch-detail-item-copy {
+  display: grid;
+  gap: 4px;
+}
+
+.merch-detail-item strong {
+  color: #edf3ff;
+}
+
+.merch-detail-item span {
+  color: #c8d3fb;
+  font-weight: 700;
 }
 
 .scheduled-supply-checklist {
@@ -360,13 +566,41 @@ body.modal-open {
 
 .scheduled-supply-checklist-row {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto auto;
-  gap: 10px;
+  grid-template-columns: minmax(0, 1fr) 170px;
+  gap: 12px;
   align-items: center;
   border: 1px solid rgba(var(--team1-rgb), 0.28);
   border-radius: 10px;
   padding: 10px;
   background: rgba(9, 14, 33, 0.48);
+}
+
+.scheduled-supply-checklist-row.is-ready {
+  border-color: rgba(83, 212, 165, 0.42);
+  background: linear-gradient(180deg, rgba(18, 69, 58, 0.34), rgba(9, 14, 33, 0.5));
+}
+
+.scheduled-supply-checklist-main {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  cursor: pointer;
+}
+
+.scheduled-supply-checklist-copy {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.scheduled-supply-checklist-copy strong {
+  font-size: 1rem;
+  color: #edf3ff;
+}
+
+.scheduled-supply-checklist-copy span:last-child {
+  color: #c8d3fb;
 }
 
 .scheduled-supply-checklist-status {
@@ -390,6 +624,15 @@ body.modal-open {
 .scheduled-supply-checklist-status.is-ready {
   background: rgba(83, 212, 165, 0.16);
   color: #86ebc2;
+}
+
+.scheduled-supply-checklist-assign {
+  display: grid;
+  gap: 5px;
+}
+
+.scheduled-supply-checklist-assign select {
+  min-height: 40px;
 }
 
 .gap-lg {
@@ -637,9 +880,21 @@ button:disabled,
   gap: 8px;
 }
 
+.event-pill-shell {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+}
+
+.event-pill-shell.has-flyer {
+  grid-template-columns: 82px minmax(0, 1fr);
+  align-items: center;
+}
+
 .event-pill-head {
   width: 100%;
   display: grid;
+  grid-template-columns: 1fr;
   gap: 6px;
   border: 1px solid rgba(var(--team-accent-rgb), 0.4);
   border-radius: 10px;
@@ -647,6 +902,67 @@ button:disabled,
   padding: 9px 10px;
   text-align: left;
   box-shadow: none;
+}
+
+.event-pill-flyer-btn {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  border-radius: 10px;
+  cursor: pointer;
+}
+
+.event-pill-flyer {
+  position: relative;
+  width: 82px;
+  height: 82px;
+  border-radius: 10px;
+  overflow: hidden;
+  border: 1px solid rgba(var(--team-accent-rgb), 0.34);
+  background: rgba(6, 10, 25, 0.78);
+  display: grid;
+  place-items: center;
+  flex: 0 0 82px;
+}
+
+.event-pill-flyer-btn:focus-visible {
+  outline: 2px solid rgba(var(--team-accent-rgb), 0.85);
+  outline-offset: 2px;
+}
+
+.event-pill-flyer img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.event-pill-flyer-placeholder {
+  color: #d7e2ff;
+  font-size: 0.64rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.event-pill-flyer-badge {
+  position: absolute;
+  right: 5px;
+  bottom: 5px;
+  padding: 2px 5px;
+  border-radius: 999px;
+  background: rgba(6, 10, 25, 0.88);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  color: #f6f8ff;
+  font-size: 0.58rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+}
+
+.event-pill-copy {
+  min-width: 0;
+  display: grid;
+  gap: 6px;
 }
 
 .event-pill-head:hover {
@@ -706,6 +1022,23 @@ button:disabled,
   font-size: 1rem;
   line-height: 1.4;
   overflow-wrap: anywhere;
+}
+
+.event-meta-status-select {
+  width: 100%;
+  min-height: 40px;
+  padding: 8px 34px 8px 10px;
+  border-radius: 10px;
+  border: 1px solid rgba(var(--team-accent-rgb), 0.42);
+  background: rgba(8, 12, 28, 0.86);
+  color: #f3f7ff;
+  font: inherit;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.event-meta-chip.is-status-chip .event-meta-value {
+  display: block;
 }
 
 #eventDetailSummary .event-meta-chip:first-child .event-meta-value {
@@ -1344,20 +1677,6 @@ button:disabled,
   object-fit: cover;
 }
 
-.player-pill-number {
-  min-width: 40px;
-  padding: 6px 8px;
-  border-radius: 999px;
-  border: 1px solid rgba(var(--team-accent-rgb), 0.45);
-  background: rgba(var(--team-accent-rgb), 0.14);
-  color: #f6f8ff;
-  font-size: 0.8rem;
-  font-weight: 800;
-  line-height: 1;
-  text-align: center;
-  white-space: nowrap;
-}
-
 .player-pill-copy {
   min-width: 0;
   display: grid;
@@ -1366,7 +1685,21 @@ button:disabled,
 }
 
 .player-pill-copy strong {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 1.3rem;
   line-height: 1.15;
+}
+
+.player-name-number {
+  color: #f5f8ff;
+  font-size: 1.15rem;
+  font-weight: 900;
+  line-height: 1;
+  letter-spacing: -0.04em;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.7), 0 0 16px rgba(var(--team-accent-rgb), 0.26);
+  white-space: nowrap;
 }
 
 .player-contact-pill {
@@ -1934,26 +2267,55 @@ button:disabled,
 
 @media (max-width: 860px) {
   .scheduled-supply-checklist-row {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: 1fr;
+  }
+
+  .merch-item-row {
+    grid-template-columns: 1fr;
+  }
+
+  .merch-item-main {
+    grid-template-columns: 1fr;
   }
 
   .scheduled-supply-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+
+  .scheduled-supply-actions {
+    grid-column: 2;
+  }
+
+  .scheduled-supply-checklist-assign {
+    max-width: 220px;
+  }
 }
 
 @media (max-width: 560px) {
   .scheduled-supply-head {
-    display: grid;
+    display: flex;
   }
 
-  .scheduled-supply-footer {
-    display: block;
+  .scheduled-supply-row {
+    gap: 7px;
+    padding: 8px;
   }
 
   .scheduled-supply-grid,
   .scheduled-supply-checklist-row {
     grid-template-columns: 1fr;
+  }
+
+  .scheduled-supply-actions {
+    grid-column: auto;
+  }
+
+  .scheduled-supply-checklist-main {
+    align-items: flex-start;
+  }
+
+  .scheduled-supply-checklist-assign {
+    max-width: none;
   }
 
   .scheduled-supply-action-btn {
